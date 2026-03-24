@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { Search as SearchIcon, Filter, Plus, Shield } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -13,6 +14,29 @@ import { getPlayers, getNationalities } from '@/services/api/players'
 import type { SearchFilters, Position } from '@/types'
 import { useSquadStore } from '@/store/useSquadStore'
 import { useSearchParams, useNavigate } from 'react-router-dom'
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05
+    }
+  }
+}
+
+const itemVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: {
+      type: 'spring' as const,
+      stiffness: 100,
+      damping: 15
+    }
+  }
+}
 
 export function Search() {
   const [searchParams] = useSearchParams()
@@ -57,13 +81,11 @@ export function Search() {
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout>
     const handleScroll = () => {
-      // Very simple infinite scroll logic for bottom trigger
       if (
         window.innerHeight + document.documentElement.scrollTop 
         >= document.documentElement.offsetHeight - 200
       ) {
         if (hasNextPage && !isFetchingNextPage) {
-          // Debounce scroll event fetching slightly
           clearTimeout(timeoutId)
           timeoutId = setTimeout(() => {
             fetchNextPage()
@@ -81,7 +103,7 @@ export function Search() {
   const players = data?.pages.flatMap(page => page.data) || []
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Player Search</h1>
@@ -189,68 +211,86 @@ export function Search() {
                 Showing {players.length} results
               </div>
               
-              {players.length === 0 ? (
-                <div className="text-center p-12 border rounded-xl border-dashed">
-                  <Shield className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-                  <h3 className="text-lg font-medium">No players found</h3>
-                  <p className="text-muted-foreground mt-2">Try adjusting your filters to see more results.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {players.map(player => (
-                    <Card key={player.id} className="overflow-hidden hover:border-primary/50 transition-colors group">
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-4">
-                          <img 
-                            src={player.photo} 
-                            alt={player.name} 
-                            className="w-16 h-16 rounded-full object-cover border-2 border-background shadow-md bg-muted"
-                            loading="lazy"
-                          />
-                          <div className="flex-1">
-                            <h3 className="font-bold text-lg leading-tight">{player.name}</h3>
-                            <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-                              <span className="font-medium bg-secondary text-secondary-foreground px-1.5 rounded">{player.position}</span>
-                              <span className="truncate">{player.club}</span>
+              <AnimatePresence mode="popLayout">
+                {players.length === 0 ? (
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-center p-12 border rounded-xl border-dashed"
+                  >
+                    <Shield className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+                    <h3 className="text-lg font-medium">No players found</h3>
+                    <p className="text-muted-foreground mt-2">Try adjusting your filters to see more results.</p>
+                  </motion.div>
+                ) : (
+                  <motion.div 
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="visible"
+                    className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
+                  >
+                    {players.map(player => (
+                      <motion.div key={player.id} variants={itemVariants}>
+                        <Card className="overflow-hidden hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 group bg-card/40 backdrop-blur-sm">
+                          <CardContent className="p-4">
+                            <div className="flex items-start gap-4">
+                              <div className="relative">
+                                <img 
+                                  src={player.photo} 
+                                  alt={player.name} 
+                                  className="w-16 h-16 rounded-full object-cover border-2 border-background shadow-md bg-muted"
+                                  loading="lazy"
+                                />
+                                <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-0.5 shadow-sm border text-[10px] font-bold px-1.5 px-1 py-0.5">
+                                  {player.rating}
+                                </div>
+                              </div>
+                              <div className="flex-1">
+                                <h3 className="font-bold text-lg leading-tight group-hover:text-primary transition-colors">{player.name}</h3>
+                                <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                                  <span className="font-medium bg-secondary text-secondary-foreground px-1.5 rounded">{player.position}</span>
+                                  <span className="truncate">{player.club}</span>
+                                </div>
+                                <div className="flex items-center justify-between mt-3 text-sm">
+                                  <span className="flex items-center gap-1 font-semibold text-amber-500">
+                                    ⭐ {player.rating}
+                                  </span>
+                                  <span className="font-mono bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
+                                    ${player.price}M
+                                  </span>
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex items-center justify-between mt-3 text-sm">
-                              <span className="flex items-center gap-1 font-semibold text-amber-500">
-                                ⭐ {player.rating}
-                              </span>
-                              <span className="font-mono bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
-                                ${player.price}M
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                      <CardFooter className="p-3 bg-muted/30 border-t">
-                        <Button 
-                          variant="ghost" 
-                          className="w-full gap-2 group-hover:bg-primary group-hover:text-primary-foreground transition-all"
-                          onClick={() => {
-                            if (slotIndex !== null) {
-                              const success = addPlayer(parseInt(slotIndex), player)
-                              if (success) {
-                                navigate('/squad')
-                              } else {
-                                alert("Cannot add player: budget, limits, or wrong position.")
-                              }
-                            } else {
-                              alert("Please start from the Squad Builder to add a player to a specific position.")
-                            }
-                          }}
-                        >
-                          <Plus className="h-4 w-4" /> Add to Squad
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  ))}
-                </div>
-              )}
+                          </CardContent>
+                          <CardFooter className="p-3 bg-muted/30 border-t group-hover:bg-primary/5 transition-colors">
+                            <Button 
+                              variant="ghost" 
+                              className="w-full gap-2 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300"
+                              onClick={() => {
+                                if (slotIndex !== null) {
+                                  const success = addPlayer(parseInt(slotIndex), player)
+                                  if (success) {
+                                    navigate('/squad')
+                                  } else {
+                                    alert("Cannot add player: budget, limits, or wrong position.")
+                                  }
+                                } else {
+                                  alert("Please start from the Squad Builder to add a player to a specific position.")
+                                }
+                              }}
+                            >
+                              <Plus className="h-4 w-4" /> Add to Squad
+                            </Button>
+                          </CardFooter>
+                        </Card>
+                      </motion.div>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
               
               {isFetchingNextPage && (
-                <div className="py-4 text-center">
+                <div className="py-8 text-center">
                    <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-primary border-r-transparent align-[-0.125em]"></div>
                 </div>
               )}
