@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Plus, Trash2, Settings, ShieldAlert, CheckCircle2 } from 'lucide-react'
 
-import { Button } from '@/components/ui/button'
 import { buttonVariants } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
