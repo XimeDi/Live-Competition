@@ -1,73 +1,79 @@
-# React + TypeScript + Vite
+# ⚽ Fantasy World Cup 2026
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A production-ready fantasy football platform for the FIFA World Cup 2026. Build your dream squad, compete globally, and track your performance in a stunning, responsive interface.
 
-Currently, two official plugins are available:
+## 🚀 Quick Start
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 🧱 Tech Stack
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Layer | Technology |
+|---|---|
+| Framework | React 19 + Vite |
+| Language | TypeScript (strict) |
+| Styling | Tailwind CSS + shadcn/ui |
+| State | Zustand (persisted) |
+| Data Fetching | TanStack React Query |
+| Forms | React Hook Form + Zod |
+| Animations | Framer Motion |
+| Routing | React Router v7 |
+| Icons | Lucide React |
+
+## 📄 Pages
+
+- **Login / Register** — Zod-validated forms with session persistence
+- **Dashboard** — Points, global rank, and quick actions with skeleton loaders
+- **Player Search** — Real-time autocomplete with debounce, filters (position, nationality, rating), and infinite scroll  
+- **Squad Builder** — Visual football pitch with formation selector (4-3-3, 4-4-2, 3-5-2), budget cap, and max 3 per country validation
+- **Leaderboard** — Global rankings with "Find Me" button and infinite scroll pagination
+- **Profile** — Saved squad overview, points breakdown per match, and account management
+
+## 🏗️ Project Structure
+
+```
+src/
+├── components/       # Shared UI components (Navbar, PageTransition, shadcn)
+│   ├── layout/       # RootLayout, Navbar
+│   └── ui/           # shadcn/ui components
+├── hooks/            # Custom hooks (useDebounce)
+├── lib/              # Utilities and Zod schemas
+├── pages/            # Route-level page components
+├── providers/        # ThemeProvider (dark/light)
+├── services/api/     # Mock API endpoints (players, leaderboard)
+├── store/            # Zustand stores (auth, squad)
+└── types/            # TypeScript interfaces
+```
+
+## ⚙️ API Endpoints (Expected Backend)
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/auth/login` | Authenticate user |
+| POST | `/auth/register` | Create new account |
+| GET | `/api/search` | Search players |
+| GET | `/api/squad` | Get user's squad |
+| POST | `/api/squad` | Save user's squad |
+| GET | `/api/leaderboard` | Global leaderboard |
+| GET | `/api/user/me` | Current user info |
+
+> Currently uses mock data. Swap the functions in `src/services/api/` to connect to a real backend.
+
+## 🎨 Design
+
+- **Theme**: FIFA World Cup inspired dark mode with vibrant purple accents
+- **Responsive**: Mobile-first design, works on all screen sizes
+- **Animations**: Framer Motion page transitions and micro-animations
+- **Loading**: Skeleton loaders throughout (no spinners)
+
+## 📦 Build for Production
+
+```bash
+npm run build
+npm run preview
 ```

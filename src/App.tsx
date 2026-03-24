@@ -1,6 +1,7 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom"
 import { RootLayout } from "./components/layout/RootLayout"
 import { ThemeProvider } from "./providers/theme-provider"
+import { PageTransition } from "./components/PageTransition"
 
 import { Home } from "./pages/Home"
 import { Login } from "./pages/Login"
@@ -15,15 +16,15 @@ const router = createBrowserRouter([
     path: "/",
     element: <RootLayout />,
     children: [
-      { path: "/", element: <Home /> },
-      { path: "/search", element: <Search /> },
-      { path: "/squad", element: <SquadBuilder /> },
-      { path: "/leaderboard", element: <Leaderboard /> },
-      { path: "/profile", element: <Profile /> },
+      { path: "/", element: <PageTransition><Home /></PageTransition> },
+      { path: "/search", element: <PageTransition><Search /></PageTransition> },
+      { path: "/squad", element: <PageTransition><SquadBuilder /></PageTransition> },
+      { path: "/leaderboard", element: <PageTransition><Leaderboard /></PageTransition> },
+      { path: "/profile", element: <PageTransition><Profile /></PageTransition> },
     ],
   },
-  { path: "/login", element: <Login /> },
-  { path: "/register", element: <Register /> },
+  { path: "/login", element: <PageTransition><Login /></PageTransition> },
+  { path: "/register", element: <PageTransition><Register /></PageTransition> },
 ])
 
 function App() {
