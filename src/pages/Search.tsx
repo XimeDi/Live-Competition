@@ -9,10 +9,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useDebounce } from '@/hooks/useDebounce'
-import { getPlayers, getNationalities, getClubs } from '@/services/api/players'
-import { SearchFilters, Position } from '@/types'
+import { getPlayers, getNationalities } from '@/services/api/players'
+import type { SearchFilters, Position } from '@/types'
+import { useSquadStore } from '@/store/useSquadStore'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 
 export function Search() {
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const slotIndex = searchParams.get('add')
+  const { addPlayer } = useSquadStore()
+
   const [searchTerm, setSearchTerm] = useState('')
   const debouncedSearch = useDebounce(searchTerm, 300)
   
@@ -33,7 +40,6 @@ export function Search() {
     data,
     fetchNextPage,
     hasNextPage,
-    isFetching,
     isFetchingNextPage,
     status
   } = useInfiniteQuery({
@@ -45,7 +51,6 @@ export function Search() {
 
   // Setup options
   const nationalities = getNationalities()
-  const clubs = getClubs()
   const positions: Position[] = ['GK', 'DEF', 'MID', 'FWD']
 
   // Handle infinite scroll trigger
@@ -127,7 +132,7 @@ export function Search() {
               <label className="text-sm font-medium">Nationality</label>
               <Select 
                  value={filters.nationality || "ALL"} 
-                 onValueChange={(val) => setFilters(prev => ({...prev, nationality: val === "ALL" ? "" : val}))}
+                 onValueChange={(val: string | null) => setFilters(prev => ({...prev, nationality: val === "ALL" || val === null ? undefined : val}))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="All Nations" />
@@ -147,7 +152,10 @@ export function Search() {
                 defaultValue={[0]} 
                 max={99} 
                 step={1}
-                onValueChange={(vals) => setFilters(prev => ({...prev, minRating: vals[0]}))}
+                onValueChange={(vals) => {
+                  const valArray = vals as number[]
+                  setFilters(prev => ({...prev, minRating: valArray[0]}))
+                }}
               />
             </div>
           </div>
@@ -217,7 +225,22 @@ export function Search() {
                         </div>
                       </CardContent>
                       <CardFooter className="p-3 bg-muted/30 border-t">
-                        <Button variant="ghost" className="w-full gap-2 group-hover:bg-primary group-hover:text-primary-foreground transition-all">
+                        <Button 
+                          variant="ghost" 
+                          className="w-full gap-2 group-hover:bg-primary group-hover:text-primary-foreground transition-all"
+                          onClick={() => {
+                            if (slotIndex !== null) {
+                              const success = addPlayer(parseInt(slotIndex), player)
+                              if (success) {
+                                navigate('/squad')
+                              } else {
+                                alert("Cannot add player: budget, limits, or wrong position.")
+                              }
+                            } else {
+                              alert("Please start from the Squad Builder to add a player to a specific position.")
+                            }
+                          }}
+                        >
                           <Plus className="h-4 w-4" /> Add to Squad
                         </Button>
                       </CardFooter>
