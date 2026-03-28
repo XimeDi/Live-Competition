@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Link, useNavigate } from "react-router-dom"
@@ -15,12 +16,15 @@ import {
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { loginSchema, type LoginFormValues } from "@/lib/schemas"
+import { loginAccount } from "@/services/api/auth"
+import { ApiError } from "@/services/api/client"
 import { useAuthStore } from "@/store/useAuthStore"
 
 export function Login() {
   const navigate = useNavigate()
   const { login } = useAuthStore()
-  
+  const [apiError, setApiError] = useState<string | null>(null)
+
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -29,15 +33,19 @@ export function Login() {
     },
   })
 
-  function onSubmit(values: LoginFormValues) {
-    // Mocking an API call
-    setTimeout(() => {
-      login(
-        { id: "1", username: values.email.split("@")[0], points: 1540, rank: 342 },
-        "mock-jwt-token"
-      )
+  async function onSubmit(values: LoginFormValues) {
+    setApiError(null)
+    try {
+      const { user, token } = await loginAccount(values)
+      login(user, token)
       navigate("/")
-    }, 500)
+    } catch (e) {
+      if (e instanceof ApiError) {
+        setApiError(e.message)
+      } else {
+        setApiError("Something went wrong. Is the server running?")
+      }
+    }
   }
 
   return (
@@ -53,6 +61,11 @@ export function Login() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {apiError ? (
+            <p className="mb-4 text-sm text-destructive" role="alert">
+              {apiError}
+            </p>
+          ) : null}
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
@@ -81,8 +94,12 @@ export function Login() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90 transition-all font-semibold">
-                Sign In
+              <Button
+                type="submit"
+                disabled={form.formState.isSubmitting}
+                className="w-full bg-primary hover:bg-primary/90 transition-all font-semibold"
+              >
+                {form.formState.isSubmitting ? "Signing in…" : "Sign In"}
               </Button>
             </form>
           </Form>

@@ -3,12 +3,14 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './index.css'
 import App from './App.tsx'
+import { AuthSessionSync } from './components/AuthSessionSync'
 
 const queryClient = new QueryClient()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
+      <AuthSessionSync />
       <App />
     </QueryClientProvider>
   </StrictMode>,

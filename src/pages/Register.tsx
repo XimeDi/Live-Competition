@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Link, useNavigate } from "react-router-dom"
@@ -15,12 +16,15 @@ import {
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { registerSchema, type RegisterFormValues } from "@/lib/schemas"
+import { registerAccount } from "@/services/api/auth"
+import { ApiError } from "@/services/api/client"
 import { useAuthStore } from "@/store/useAuthStore"
 
 export function Register() {
   const navigate = useNavigate()
   const { login } = useAuthStore()
-  
+  const [apiError, setApiError] = useState<string | null>(null)
+
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -31,15 +35,23 @@ export function Register() {
     },
   })
 
-  function onSubmit(values: RegisterFormValues) {
-    // Mocking an API call
-    setTimeout(() => {
-      login(
-        { id: "2", username: values.username, points: 0, rank: 0 },
-        "mock-jwt-token"
-      )
+  async function onSubmit(values: RegisterFormValues) {
+    setApiError(null)
+    try {
+      const { user, token } = await registerAccount({
+        username: values.username,
+        email: values.email,
+        password: values.password,
+      })
+      login(user, token)
       navigate("/")
-    }, 500)
+    } catch (e) {
+      if (e instanceof ApiError) {
+        setApiError(e.message)
+      } else {
+        setApiError("Something went wrong. Is the server running?")
+      }
+    }
   }
 
   return (
@@ -55,6 +67,11 @@ export function Register() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {apiError ? (
+            <p className="mb-4 text-sm text-destructive" role="alert">
+              {apiError}
+            </p>
+          ) : null}
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
@@ -109,8 +126,12 @@ export function Register() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90 transition-all font-semibold">
-                Sign Up
+              <Button
+                type="submit"
+                disabled={form.formState.isSubmitting}
+                className="w-full bg-primary hover:bg-primary/90 transition-all font-semibold"
+              >
+                {form.formState.isSubmitting ? "Creating account…" : "Sign Up"}
               </Button>
             </form>
           </Form>

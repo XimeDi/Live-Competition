@@ -4,12 +4,26 @@ A production-ready fantasy football platform for the FIFA World Cup 2026. Build 
 
 ## 🚀 Quick Start
 
+**Frontend** (from project root):
+
 ```bash
 npm install
 npm run dev
 ```
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+**Backend** (in another terminal, required for login/register):
+
+```bash
+cd server
+cp .env.example .env   # first time only; edit JWT_SECRET for production
+npm install
+npx prisma migrate dev # first time only (creates SQLite DB)
+npm run dev
+```
+
+The API listens on [http://localhost:3001](http://localhost:3001). Vite proxies `/auth` and `/api` to that port during `npm run dev`.
 
 ## 🧱 Tech Stack
 
@@ -45,7 +59,7 @@ src/
 ├── lib/              # Utilities and Zod schemas
 ├── pages/            # Route-level page components
 ├── providers/        # ThemeProvider (dark/light)
-├── services/api/     # Mock API endpoints (players, leaderboard)
+├── services/api/     # API client (auth + mock players/leaderboard)
 ├── store/            # Zustand stores (auth, squad)
 └── types/            # TypeScript interfaces
 ```
@@ -62,7 +76,7 @@ src/
 | GET | `/api/leaderboard` | Global leaderboard |
 | GET | `/api/user/me` | Current user info |
 
-> Currently uses mock data. Swap the functions in `src/services/api/` to connect to a real backend.
+> **Auth** is wired to the real server in `server/`. Player search, squad, and leaderboard still use mock modules under `src/services/api/` until those endpoints are implemented.
 
 ## 🎨 Design
 
