@@ -1,6 +1,6 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom"
-import { RootLayout } from "./components/layout/RootLayout"
 import { ThemeProvider } from "./providers/theme-provider"
+import { RootLayout } from "./components/layout/RootLayout"
 import { PageTransition } from "./components/PageTransition"
 
 import { Home } from "./pages/Home"
@@ -27,10 +27,13 @@ const router = createBrowserRouter([
   { path: "/register", element: <PageTransition><Register /></PageTransition> },
 ])
 
+import { Toaster } from 'sonner'
+
 function App() {
   return (
     <ThemeProvider defaultTheme="dark" storageKey="fantasy-theme">
       <RouterProvider router={router} />
+      <Toaster position="top-center" richColors />
     </ThemeProvider>
   )
 }

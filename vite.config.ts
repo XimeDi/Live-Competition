@@ -14,5 +14,8 @@ export default defineConfig({
       "/auth": { target: "http://localhost:3001", changeOrigin: true },
       "/api": { target: "http://localhost:3001", changeOrigin: true },
     },
-  },
+    port: 3000,
+    allowedHosts: ["vexatiously-dextrocular-esteban.ngrok-free.dev"],
+    host: true, // Listen on all network interfaces
+  }
 })

@@ -1,89 +1,141 @@
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  .theme {
-    --font-heading: var(--font-sans);
-    --font-sans: 'Geist Variable', sans-serif
-  }
   :root {
-    --background: oklch(0.98 0.005 250);
-    --foreground: oklch(0.15 0.02 260);
-    --card: oklch(0.97 0.005 250);
-    --card-foreground: oklch(0.15 0.02 260);
-    --popover: oklch(0.98 0.005 250);
-    --popover-foreground: oklch(0.15 0.02 260);
-    --primary: oklch(0.55 0.22 290);
-    --primary-foreground: oklch(0.98 0 0);
-    --secondary: oklch(0.95 0.01 290);
-    --secondary-foreground: oklch(0.25 0.05 290);
-    --muted: oklch(0.95 0.01 260);
-    --muted-foreground: oklch(0.5 0.02 260);
-    --accent: oklch(0.95 0.02 290);
-    --accent-foreground: oklch(0.25 0.05 290);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.9 0.01 260);
-    --input: oklch(0.9 0.01 260);
-    --ring: oklch(0.55 0.22 290);
-    --chart-1: oklch(0.55 0.22 290);
-    --chart-2: oklch(0.65 0.15 340);
-    --chart-3: oklch(0.7 0.12 180);
-    --chart-4: oklch(0.6 0.18 60);
-    --chart-5: oklch(0.5 0.2 120);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.97 0.005 250);
-    --sidebar-foreground: oklch(0.15 0.02 260);
-    --sidebar-primary: oklch(0.55 0.22 290);
-    --sidebar-primary-foreground: oklch(0.98 0 0);
-    --sidebar-accent: oklch(0.95 0.02 290);
-    --sidebar-accent-foreground: oklch(0.25 0.05 290);
-    --sidebar-border: oklch(0.9 0.01 260);
-    --sidebar-ring: oklch(0.55 0.22 290)
+    --background: 0 0 95; /* Broadcast Platinum - Slightly darker for contrast */
+    --foreground: 0 0 10;
+    --card: 0 0 98;
+    --card-foreground: 0 0 10;
+    --popover: 0 0 98;
+    --popover-foreground: 0 0 10;
+    --primary: 0.7 0.25 150; /* Emerald Broadcast Green */
+    --primary-foreground: 0.98 0.01 150;
+    --secondary: 0.82 0.15 85; /* Premium World Cup Gold */
+    --secondary-foreground: 0.1 0.02 85;
+    --muted: 0 0 90;
+    --muted-foreground: 0 0 40;
+    --accent: 0 0 90;
+    --accent-foreground: 0 0 10;
+    --destructive: 0.61 0.21 27; /* Broadcast Red */
+    --border: 0 0 85;
+    --input: 0 0 85;
+    --ring: 0.7 0.25 150;
+    --radius: 1rem;
+    
+    color-scheme: light;
   }
+
   .dark {
-    --background: oklch(0.13 0.02 270);
-    --foreground: oklch(0.95 0.01 260);
-    --card: oklch(0.17 0.025 270);
-    --card-foreground: oklch(0.95 0.01 260);
-    --popover: oklch(0.17 0.025 270);
-    --popover-foreground: oklch(0.95 0.01 260);
-    --primary: oklch(0.7 0.2 290);
-    --primary-foreground: oklch(0.13 0.02 270);
-    --secondary: oklch(0.22 0.03 270);
-    --secondary-foreground: oklch(0.95 0.01 260);
-    --muted: oklch(0.22 0.03 270);
-    --muted-foreground: oklch(0.65 0.02 260);
-    --accent: oklch(0.22 0.04 290);
-    --accent-foreground: oklch(0.95 0.01 260);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.7 0.2 290);
-    --chart-1: oklch(0.7 0.2 290);
-    --chart-2: oklch(0.7 0.15 340);
-    --chart-3: oklch(0.65 0.12 180);
-    --chart-4: oklch(0.6 0.18 60);
-    --chart-5: oklch(0.5 0.2 120);
-    --sidebar: oklch(0.17 0.025 270);
-    --sidebar-foreground: oklch(0.95 0.01 260);
-    --sidebar-primary: oklch(0.7 0.2 290);
-    --sidebar-primary-foreground: oklch(0.95 0.01 260);
-    --sidebar-accent: oklch(0.22 0.04 290);
-    --sidebar-accent-foreground: oklch(0.95 0.01 260);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.7 0.2 290)
+    --background: 0.08 0.02 240; /* Deeper Stadium Navy */
+    --foreground: 0.98 0.01 240;
+    --card: 0.12 0.03 240;
+    --card-foreground: 0.98 0.01 240;
+    --popover: 0.1 0.03 240;
+    --popover-foreground: 0.98 0.01 240;
+    --primary: 0.7 0.25 150; /* Emerald Broadcast Green */
+    --primary-foreground: 0.05 0.01 150;
+    --secondary: 0.82 0.15 85; /* Premium World Cup Gold */
+    --secondary-foreground: 0.1 0.02 85;
+    --muted: 0.15 0.02 240;
+    --muted-foreground: 0.6 0.02 240;
+    --accent: 0.2 0.06 150;
+    --accent-foreground: 0.98 0.01 150;
+    --destructive: 0.6 0.22 25;
+    --border: 0 0 100; /* White borders for stadium look */
+    --input: 1 0 0;
+    --ring: 0.7 0.25 150;
+    
+    color-scheme: dark;
   }
+}
+
+@layer base {
   * {
-    @apply border-border outline-ring/50;
+    border-color: oklch(var(--border) / 0.1);
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
+  
   html {
-    @apply font-sans;
+     @apply transition-colors duration-500;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased min-h-screen relative;
+    background-image: 
+      radial-gradient(circle at 50% -20%, oklch(var(--primary) / 8%), transparent 70%),
+      radial-gradient(circle at 100% 100%, oklch(var(--secondary) / 3%), transparent 50%),
+      url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10 10h1v1h-1z' fill='%23000000' fill-opacity='0.02'/%3E%3C/svg%3E");
+    background-attachment: fixed;
+  }
+  
+  html.dark body {
+    background-image: 
+      radial-gradient(circle at 50% -20%, oklch(var(--primary) / 12%), transparent 70%),
+      radial-gradient(circle at 100% 100%, oklch(var(--secondary) / 5%), transparent 50%),
+      url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10 10h1v1h-1z' fill='%23ffffff' fill-opacity='0.03'/%3E%3C/svg%3E");
+  }
+
+  ::selection {
+    background-color: oklch(var(--primary) / 0.4);
+    color: oklch(var(--primary-foreground));
+  }
+}
+
+@layer components {
+  .broadcast-glass {
+    @apply backdrop-blur-3xl border shadow-2xl transition-all duration-500;
+    border-color: oklch(var(--foreground) / 0.1);
+    background: linear-gradient(135deg, oklch(var(--card) / 0.6), oklch(var(--background) / 0.4));
+  }
+
+  .fifa-card {
+    @apply relative overflow-hidden rounded-[2rem] border backdrop-blur-2xl shadow-xl transition-all duration-500 hover:-translate-y-2;
+    border-color: oklch(var(--foreground) / 0.05);
+    background-color: oklch(var(--card) / 0.4);
+  }
+
+  /* 3D Perspective Utilities */
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+  
+  .pitch-3d {
+    transform: rotateX(25deg) rotateZ(-2deg) scale(1.05);
+    transform-style: preserve-3d;
+    box-shadow: 0 50px 100px -20px rgba(0,0,0,0.8);
+  }
+
+  .pitch-grass {
+    background: linear-gradient(to bottom, oklch(0.3 0.1 140), oklch(0.2 0.08 140));
+    background-image: 
+      repeating-linear-gradient(0deg, transparent, transparent 10%, oklch(1 0 0 / 2%) 10%, oklch(1 0 0 / 2%) 20%),
+      radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.4) 100%);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .dark .pitch-grass {
+    background: linear-gradient(to bottom, #062011, #082d18);
+  }
+
+  /* Custom Scrollbar for Broadcast UI */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background-color: oklch(var(--background) / 0.5);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full transition-colors;
+    background-color: oklch(var(--foreground) / 0.1);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: oklch(var(--primary) / 0.5);
   }
 }

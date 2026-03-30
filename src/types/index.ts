@@ -17,6 +17,7 @@ export interface SearchFilters {
   position?: Position | 'ALL'
   club?: string
   minRating: number
+  maxPrice: number
 }
 
 export interface PaginatedResponse<T> {

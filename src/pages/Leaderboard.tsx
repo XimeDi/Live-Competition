@@ -1,6 +1,6 @@
 import { useRef, useCallback } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { Trophy, Medal, Search, ArrowDown } from 'lucide-react'
+import { Trophy, Search, ArrowDown } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 import { Button } from '@/components/ui/button'
@@ -54,127 +54,154 @@ export function Leaderboard() {
 
   const entries = data?.pages.flatMap((page) => page.data) ?? []
 
-  const getRankIcon = (rank: number) => {
-    if (rank === 1) return <Trophy className="h-5 w-5 text-yellow-400 drop-shadow-lg" />
-    if (rank === 2) return <Medal className="h-5 w-5 text-gray-300 drop-shadow-md" />
-    if (rank === 3) return <Medal className="h-5 w-5 text-amber-600 drop-shadow-md" />
-    return <span className="text-sm font-mono text-muted-foreground w-5 text-center">{rank}</span>
-  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <motion.div
-           initial={{ opacity: 0, x: -20 }}
-           animate={{ opacity: 1, x: 0 }}
-        >
-          <h1 className="text-3xl font-bold tracking-tight">Global Leaderboard</h1>
-          <p className="text-muted-foreground">See how you stack up against managers worldwide.</p>
-        </motion.div>
-        <Button variant="outline" onClick={scrollToMe} className="gap-2 shadow-sm hover:shadow-md transition-all">
-          <Search className="h-4 w-4" /> Find Me
-        </Button>
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Stadium Backdrop */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1543351611-58f69d7c1781?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-5 grayscale" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-background/95 to-background" />
       </div>
 
-      <div className="rounded-xl border overflow-hidden bg-card/40 backdrop-blur-sm shadow-xl border-primary/10">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/50">
-                <th className="text-left py-4 px-6 font-bold w-20 uppercase tracking-wider text-muted-foreground">Rank</th>
-                <th className="text-left py-4 px-6 font-bold uppercase tracking-wider text-muted-foreground">Manager</th>
-                <th className="text-right py-4 px-6 font-bold uppercase tracking-wider text-muted-foreground">Points</th>
-              </tr>
-            </thead>
-            <AnimatePresence mode="popLayout">
-              <motion.tbody
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
-              >
-                {status === 'pending' ? (
-                  Array.from({ length: 10 }).map((_, i) => (
-                    <tr key={i} className="border-b opacity-50">
-                      <td className="py-4 px-6"><Skeleton className="h-5 w-8" /></td>
-                      <td className="py-4 px-6"><Skeleton className="h-5 w-48" /></td>
-                      <td className="py-4 px-6 text-right"><Skeleton className="h-5 w-16 ml-auto" /></td>
-                    </tr>
-                  ))
-                ) : status === 'error' ? (
-                  <tr>
-                    <td colSpan={3} className="text-center py-16 text-destructive">
-                      Failed to load leaderboard. Please try again.
-                    </td>
-                  </tr>
-                ) : (
-                  entries.map((entry) => {
-                    const isMe = user?.username === entry.username || user?.id === entry.userId
-                    return (
-                      <motion.tr
-                        key={entry.userId}
-                        variants={rowVariants}
-                        // @ts-ignore - ref on motion component
-                        ref={isMe ? myRowRef : undefined}
-                        className={`border-b transition-all duration-300 group ${
-                          isMe
-                            ? 'bg-primary/15 border-primary/40'
-                            : 'hover:bg-primary/5'
-                        } ${entry.rank <= 3 ? 'bg-gradient-to-r from-amber-500/5 to-transparent' : ''}`}
-                      >
-                        <td className="py-4 px-6">
-                          <div className="flex items-center">{getRankIcon(entry.rank)}</div>
-                        </td>
-                        <td className="py-4 px-6">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 border-2 ${
-                              isMe ? 'border-primary bg-primary text-primary-foreground' : 'border-muted bg-muted text-muted-foreground group-hover:border-primary/50 group-hover:text-primary transition-colors'
-                            }`}>
-                              {entry.username.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="flex flex-col">
-                              <span className={`font-semibold ${isMe ? 'text-primary' : 'text-foreground'}`}>
-                                {entry.username}
-                              </span>
-                              <span className="text-[10px] text-muted-foreground uppercase tracking-tight">Manager</span>
-                            </div>
-                            {isMe && (
-                              <span className="text-[10px] bg-primary text-primary-foreground px-2 py-0.5 rounded-full font-bold ml-1">
-                                YOU
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-4 px-6 text-right">
-                          <span className={`font-mono text-lg font-black ${isMe ? 'text-primary' : 'text-foreground opacity-90'}`}>
-                            {entry.points.toLocaleString()}
-                          </span>
-                        </td>
-                      </motion.tr>
-                    )
-                  })
-                )}
-              </motion.tbody>
-            </AnimatePresence>
-          </table>
+      <div className="container relative z-10 py-10 space-y-12">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b-4 border-primary/20 pb-8">
+          <motion.div
+             initial={{ opacity: 0, x: -20 }}
+             animate={{ opacity: 1, x: 0 }}
+          >
+            <div className="flex items-center gap-2 text-primary mb-2">
+              <Trophy className="h-4 w-4" />
+              <span className="text-[10px] font-oswald font-black uppercase tracking-[0.4em]">Global Standings // FIFA 2026</span>
+            </div>
+            <h1 className="text-6xl md:text-8xl font-oswald font-black tracking-tighter uppercase italic leading-[0.8]">
+              WORLD <span className="text-primary italic">RANKING</span>
+            </h1>
+          </motion.div>
+          <Button 
+            variant="outline" 
+            onClick={scrollToMe} 
+            className="h-14 px-10 font-oswald font-black uppercase tracking-widest border-2 border-primary/20 hover:bg-primary hover:text-black transition-all gap-3 bg-card/40 backdrop-blur-xl rounded-xl"
+          >
+            <Search className="h-4 w-4" /> FIND MY SQUAD
+          </Button>
         </div>
 
-        {hasNextPage && (
-          <div className="p-6 text-center border-t bg-muted/10">
-            <Button
-              variant="ghost"
-              onClick={() => fetchNextPage()}
-              disabled={isFetchingNextPage}
-              className="gap-2 hover:bg-primary hover:text-primary-foreground transition-all px-8 border border-primary/20"
-            >
-              {isFetchingNextPage ? (
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-r-transparent" />
-              ) : (
-                <ArrowDown className="h-4 w-4" />
-              )}
-              {isFetchingNextPage ? 'Loading More Players...' : 'Load Next 20 Managers'}
-            </Button>
+        <div className="rounded-[2.5rem] border-2 border-white/5 overflow-hidden bg-foreground/5 backdrop-blur-3xl shadow-[0_50px_100px_rgba(0,0,0,0.6)]">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-primary border-b-2 border-black/10">
+                  <th className="text-left py-6 px-12 font-oswald font-black uppercase tracking-widest text-black italic text-xs">Pos</th>
+                  <th className="text-left py-6 px-12 font-oswald font-black uppercase tracking-widest text-black italic text-xs">Manager</th>
+                  <th className="text-right py-6 px-12 font-oswald font-black uppercase tracking-widest text-black italic text-xs">Rating Points</th>
+                </tr>
+              </thead>
+              <AnimatePresence mode="popLayout">
+                <motion.tbody
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  {status === 'pending' ? (
+                    Array.from({ length: 10 }).map((_, i) => (
+                      <tr key={i} className="border-b border-white/5 opacity-50">
+                        <td className="py-8 px-12"><Skeleton className="h-10 w-10 rounded-lg" /></td>
+                        <td className="py-8 px-12"><Skeleton className="h-10 w-64 rounded-lg" /></td>
+                        <td className="py-8 px-12 text-right"><Skeleton className="h-10 w-24 ml-auto rounded-lg" /></td>
+                      </tr>
+                    ))
+                  ) : status === 'error' ? (
+                    <tr>
+                      <td colSpan={3} className="text-center py-32">
+                        <h3 className="text-4xl font-oswald font-black text-destructive italic uppercase">Connection Lost</h3>
+                        <p className="font-barlow font-bold opacity-70">Server synchronization failed.</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    entries.map((entry) => {
+                      const isMe = user?.username === entry.username || user?.id === entry.userId
+                      return (
+                        <motion.tr
+                          key={entry.userId}
+                          variants={rowVariants}
+                          // @ts-ignore - ref on motion component
+                          ref={isMe ? myRowRef : undefined}
+                          className={`transition-all duration-300 group border-b border-white/5 ${
+                            isMe
+                              ? 'bg-primary/20 relative after:absolute after:left-0 after:top-0 after:bottom-0 after:w-2 after:bg-primary'
+                              : 'hover:bg-foreground/5'
+                          }`}
+                        >
+                          <td className="py-8 px-12">
+                            <div className="flex items-center text-4xl font-oswald font-black italic">
+                              {entry.rank <= 3 ? (
+                                <div className="flex items-center gap-4">
+                                  <span className={entry.rank === 1 ? 'text-secondary' : entry.rank === 2 ? 'text-slate-300' : 'text-amber-600'}>
+                                    {entry.rank.toString().padStart(2, '0')}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-foreground/20 group-hover:text-primary/60 transition-colors">
+                                  {entry.rank.toString().padStart(2, '0')}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-8 px-12">
+                            <div className="flex items-center gap-8">
+                              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-oswald font-black shrink-0 border-2 transition-all duration-500 ${
+                                isMe ? 'border-primary bg-primary text-black' : 'border-white/10 bg-foreground/5 text-foreground/40 group-hover:border-primary/40'
+                              }`}>
+                                {entry.username.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="flex flex-col">
+                                <span className={`text-3xl font-oswald font-black uppercase tracking-tighter italic ${isMe ? 'text-primary' : 'text-foreground'}`}>
+                                  {entry.username}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className={`h-2 w-2 rounded-full ${isMe ? 'bg-primary' : 'bg-emerald-500'} animate-pulse`} />
+                                  <span className="text-[10px] text-foreground/30 font-black uppercase tracking-[0.2em]">Verified Manager</span>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-8 px-12 text-right">
+                            <div className="flex flex-col items-end">
+                              <span className={`text-5xl font-oswald font-black italic tracking-tighter ${isMe ? 'text-primary' : 'text-foreground group-hover:text-primary transition-colors'}`}>
+                                {entry.points.toLocaleString()}
+                              </span>
+                              <span className="text-[10px] font-black text-foreground/20 uppercase tracking-[0.3em] mt-1 italic">World Pts</span>
+                            </div>
+                          </td>
+                        </motion.tr>
+                      )
+                    })
+                  )}
+                </motion.tbody>
+              </AnimatePresence>
+            </table>
           </div>
-        )}
+
+          {hasNextPage && (
+            <div className="p-12 text-center border-t border-white/5 bg-black/20">
+              <Button
+                variant="ghost"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="h-16 px-16 font-oswald font-black uppercase tracking-[0.3em] italic border-2 border-primary/20 hover:bg-primary hover:text-black transition-all shadow-2xl group/btn rounded-2xl"
+              >
+                {isFetchingNextPage ? (
+                  <div className="h-6 w-6 animate-spin rounded-full border-4 border-primary border-r-transparent" />
+                ) : (
+                  <div className="flex items-center gap-4">
+                    <ArrowDown className="h-5 w-5 group-hover/btn:translate-y-1 transition-transform text-primary" />
+                    Load More Rankings
+                  </div>
+                )}
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
