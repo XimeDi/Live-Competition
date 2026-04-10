@@ -1,9 +1,9 @@
 import type { FastifyInstance } from "fastify"
-import { Prisma } from "@prisma/client"
 import { z } from "zod"
-import { prisma } from "../lib/prisma.js"
 import { signAccessToken } from "../lib/jwt.js"
+import { syncLeaderboardScore } from "../lib/leaderboard.js"
 import { hashPassword, verifyPassword } from "../lib/password.js"
+import { createUserInStore, findUserByEmail } from "../lib/userStore.js"
 import { toPublicUser } from "../lib/user.js"
 
 const registerBody = z.object({
@@ -26,20 +26,13 @@ export async function authRoutes(app: FastifyInstance) {
     }
     const { username, email, password } = parsed.data
     const passwordHash = await hashPassword(password)
-    try {
-      const user = await prisma.user.create({
-        data: { username, email, passwordHash },
-      })
-      const token = signAccessToken(user.id)
-      return reply.status(201).send({ user: toPublicUser(user), token })
-    } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-        const target = (e.meta?.target as string[] | undefined) ?? []
-        const field = target.includes("email") ? "email" : target.includes("username") ? "username" : "field"
-        return reply.status(409).send({ error: `${field} already in use` })
-      }
-      throw e
+    const result = await createUserInStore({ username, email, passwordHash })
+    if ("conflict" in result) {
+      return reply.status(409).send({ error: `${result.conflict} already in use` })
     }
+    await syncLeaderboardScore(result.user.id, result.user.points)
+    const token = signAccessToken(result.user.id)
+    return reply.status(201).send({ user: toPublicUser(result.user), token })
   })
 
   app.post("/login", async (request, reply) => {
@@ -49,7 +42,7 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: "Validation failed", details: msg })
     }
     const { email, password } = parsed.data
-    const user = await prisma.user.findUnique({ where: { email } })
+    const user = await findUserByEmail(email)
     if (!user) {
       return reply.status(401).send({ error: "Invalid email or password" })
     }
@@ -57,6 +50,7 @@ export async function authRoutes(app: FastifyInstance) {
     if (!ok) {
       return reply.status(401).send({ error: "Invalid email or password" })
     }
+    await syncLeaderboardScore(user.id, user.points)
     const token = signAccessToken(user.id)
     return reply.send({ user: toPublicUser(user), token })
   })

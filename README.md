@@ -15,15 +15,22 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 **Backend** (in another terminal, required for login/register):
 
+1. Run **Redis** locally, for example:
+
+```bash
+docker run -d --name redis-live -p 6379:6379 redis:7-alpine
+```
+
+2. Start the API:
+
 ```bash
 cd server
-cp .env.example .env   # first time only; edit JWT_SECRET for production
+cp .env.example .env   # first time only; set REDIS_URL and JWT_SECRET for production
 npm install
-npx prisma migrate dev # first time only (creates SQLite DB)
 npm run dev
 ```
 
-The API listens on [http://localhost:3001](http://localhost:3001). Vite proxies `/auth` and `/api` to that port during `npm run dev`.
+User accounts are stored in **Redis** (see `REDIS_URL` in `.env`). The API listens on [http://localhost:3001](http://localhost:3001). Vite proxies `/auth` and `/api` to that port during `npm run dev`.
 
 ## 🧱 Tech Stack
 
@@ -76,7 +83,7 @@ src/
 | GET | `/api/leaderboard` | Global leaderboard |
 | GET | `/api/user/me` | Current user info |
 
-> **Auth** is wired to the real server in `server/`. Player search, squad, and leaderboard still use mock modules under `src/services/api/` until those endpoints are implemented.
+> **Auth** and **global leaderboard** (`GET /api/leaderboard`) are wired to the real server in `server/` (Redis sorted set). Player search and squad still use mock modules under `src/services/api/` until those endpoints are implemented.
 
 ## 🎨 Design
 
