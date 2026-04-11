@@ -12,11 +12,16 @@ export interface Player {
 }
 
 export interface SearchFilters {
+  /** Sent to API only when length >= 2 (F2.1). */
   query: string
-  nationality?: string
+  /** OR group in Meilisearch (F2.3). */
+  nationalities: string[]
   position?: Position | 'ALL'
-  club?: string
+  club: string
   minRating: number
+  /** Upper OVR cap; 99 = no filter sent. */
+  maxRating: number
+  minPrice: number
   maxPrice: number
 }
 

@@ -32,7 +32,17 @@ export const translations = {
       noResults: "No matches found",
       noResultsSub: "Your scouts couldn't find any players with the current filters.",
       marketValue: "Market Value",
-      any: "Any"
+      any: "Any",
+      typeTwoMore: "Type at least 2 characters to search by name",
+      nationalities: "Nationalities",
+      nationalitiesHint: "Select one or more (OR)",
+      clearNations: "Clear",
+      club: "Club",
+      allClubs: "All clubs",
+      maxOvr: "Max. OVR",
+      minPrice: "Min. price",
+      suggestions: "Suggestions",
+      prospectsCount: "{{shown}} on screen · {{total}} matches"
     },
     errors: {
       insubBudget: "Insufficient budget for this signing!",
@@ -75,7 +85,17 @@ export const translations = {
       noResults: "No se encontraron resultados",
       noResultsSub: "Tus ojeadores no encontraron jugadores con esos criterios.",
       marketValue: "Valor de Mercado",
-      any: "Cualquiera"
+      any: "Cualquiera",
+      typeTwoMore: "Escribe al menos 2 letras para buscar por nombre",
+      nationalities: "Nacionalidades",
+      nationalitiesHint: "Varias = OR",
+      clearNations: "Limpiar",
+      club: "Club",
+      allClubs: "Todos los clubes",
+      maxOvr: "Media máx. (OVR)",
+      minPrice: "Precio mín.",
+      suggestions: "Sugerencias",
+      prospectsCount: "{{shown}} en pantalla · {{total}} coincidencias"
     },
     errors: {
       insubBudget: "¡Presupuesto insuficiente para este fichaje!",

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useInfiniteQuery } from '@tanstack/react-query'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { Search as SearchIcon, Filter, Shield } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSearchParams } from 'react-router-dom'
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useDebounce } from '@/hooks/useDebounce'
-import { getPlayers, getNationalities } from '@/services/api/players'
+import { getPlayers, getSearchMeta, getSearchSuggest } from '@/services/api/players'
 import type { SearchFilters, Position } from '@/types'
 import { useSquadStore } from '@/store/useSquadStore'
 import { useUiStore } from "@/store/useUiStore"
@@ -54,22 +54,59 @@ export function Search() {
 
   const [searchTerm, setSearchTerm] = useState('')
   const debouncedSearch = useDebounce(searchTerm, 300)
-  
+  const debouncedSuggestQ = useDebounce(searchTerm, 150)
+  const searchInputWrapRef = useRef<HTMLDivElement>(null)
+  const [suggestOpen, setSuggestOpen] = useState(false)
+
   const [filters, setFilters] = useState<SearchFilters>({
     query: '',
+    nationalities: [],
     minRating: 0,
+    maxRating: 99,
+    minPrice: 0,
     maxPrice: 300,
     position: initialPos,
-    nationality: '',
-    club: ''
+    club: '',
   })
 
   const [signedPlayer, setSignedPlayer] = useState<any | null>(null)
   const [scoutPlayer, setScoutPlayer] = useState<any | null>(null)
 
   useEffect(() => {
-    setFilters(prev => ({ ...prev, query: debouncedSearch }))
+    const trimmed = debouncedSearch.trim()
+    setFilters((prev) => ({ ...prev, query: trimmed.length >= 2 ? trimmed : '' }))
   }, [debouncedSearch])
+
+  const { data: suggestData } = useQuery({
+    queryKey: ['search-suggest', debouncedSuggestQ],
+    queryFn: () => getSearchSuggest(debouncedSuggestQ.trim()),
+    enabled: debouncedSuggestQ.trim().length >= 2,
+    staleTime: 10_000,
+  })
+
+  const suggestions = suggestData?.suggestions ?? []
+
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (!searchInputWrapRef.current?.contains(e.target as Node)) {
+        setSuggestOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [])
+
+  const toggleNationality = useCallback((n: string) => {
+    setFilters((prev) => {
+      const has = prev.nationalities.includes(n)
+      return {
+        ...prev,
+        nationalities: has
+          ? prev.nationalities.filter((x) => x !== n)
+          : [...prev.nationalities, n],
+      }
+    })
+  }, [])
 
   useEffect(() => {
     if (initialPos && initialPos !== filters.position) {
@@ -90,7 +127,14 @@ export function Search() {
     getNextPageParam: (lastPage) => lastPage.nextPage,
   })
 
-  const nationalities = getNationalities()
+  const { data: searchMeta } = useQuery({
+    queryKey: ['search-meta'],
+    queryFn: getSearchMeta,
+    staleTime: 60 * 60 * 1000,
+  })
+
+  const nationalities = searchMeta?.nationalities ?? []
+  const clubs = searchMeta?.clubs ?? []
   const positions: Position[] = ['GK', 'DEF', 'MID', 'FWD']
 
   const handleSign = (player: any) => {
@@ -131,7 +175,14 @@ export function Search() {
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
-  const players = data?.pages.flatMap(page => page.data) || []
+  const players = data?.pages.flatMap((page) => page.data) || []
+  const totalCount = data?.pages[0]?.total ?? 0
+  const prospectsLabel =
+    status === 'pending'
+      ? 'ANALYZING MARKET...'
+      : t.prospectsCount
+          .replace('{{shown}}', String(players.length))
+          .replace('{{total}}', String(totalCount))
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
@@ -185,14 +236,43 @@ export function Search() {
               <div className="p-8 space-y-8">
                 <div className="space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 font-barlow italic">Search Metadata</label>
-                  <div className="relative group">
-                    <SearchIcon className="absolute left-4 top-4 h-4 w-4 text-foreground/20 group-focus-within:text-primary transition-colors" />
+                  <div ref={searchInputWrapRef} className="relative group">
+                    <SearchIcon className="absolute left-4 top-4 h-4 w-4 text-foreground/20 group-focus-within:text-primary transition-colors z-10 pointer-events-none" />
                     <Input 
                       placeholder={t.searchPlaceholder}
                       className="pl-12 h-14 bg-black/20 border-white/5 font-barlow italic text-lg rounded-2xl focus:ring-primary focus:border-primary transition-all placeholder:text-foreground/10"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
+                      onFocus={() => setSuggestOpen(true)}
+                      autoComplete="off"
                     />
+                    {searchTerm.trim().length === 1 && (
+                      <p className="text-[10px] text-foreground/40 font-barlow mt-2 px-1">{t.typeTwoMore}</p>
+                    )}
+                    {suggestOpen && suggestions.length > 0 && searchTerm.trim().length >= 2 && (
+                      <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-2xl border border-white/10 bg-background/95 backdrop-blur-xl shadow-2xl overflow-hidden">
+                        <p className="text-[9px] font-oswald font-black uppercase tracking-widest text-primary px-4 py-2 border-b border-white/5">
+                          {t.suggestions}
+                        </p>
+                        <ul className="max-h-56 overflow-y-auto py-1">
+                          {suggestions.map((s) => (
+                            <li key={s.id}>
+                              <button
+                                type="button"
+                                className="w-full text-left px-4 py-2.5 text-sm font-barlow hover:bg-primary/10 transition-colors"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  setSearchTerm(s.name)
+                                  setSuggestOpen(false)
+                                }}
+                              >
+                                {s.name}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -215,18 +295,61 @@ export function Search() {
                 </div>
 
                 <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 font-barlow italic">Nationality</label>
-                  <Select 
-                     value={filters.nationality || "ALL"} 
-                     onValueChange={(val: string | null) => setFilters(prev => ({...prev, nationality: val === "ALL" || val === null ? undefined : val}))}
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 font-barlow italic">
+                      {t.nationalities}
+                    </label>
+                    {filters.nationalities.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setFilters((prev) => ({ ...prev, nationalities: [] }))}
+                        className="text-[9px] font-oswald font-black uppercase tracking-widest text-primary hover:underline"
+                      >
+                        {t.clearNations}
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[9px] text-foreground/30 font-barlow -mt-1">{t.nationalitiesHint}</p>
+                  <div className="max-h-48 overflow-y-auto space-y-2 rounded-2xl border border-white/10 bg-black/20 p-3">
+                    {nationalities.map((n) => (
+                      <label
+                        key={n}
+                        className="flex items-center gap-3 text-sm font-barlow cursor-pointer text-foreground/80 hover:text-foreground"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={filters.nationalities.includes(n)}
+                          onChange={() => toggleNationality(n)}
+                          className="rounded border-white/20 bg-black/40 text-primary focus:ring-primary"
+                        />
+                        <span>{n}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 font-barlow italic">
+                    {t.club}
+                  </label>
+                  <Select
+                    value={filters.club || 'ALL'}
+                    onValueChange={(val) =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        club: !val || val === 'ALL' ? '' : val,
+                      }))
+                    }
                   >
                     <SelectTrigger className="bg-black/20 border-white/5 h-14 font-oswald uppercase font-black italic rounded-2xl text-foreground/80">
-                      <SelectValue placeholder="All Nations" />
+                      <SelectValue placeholder={t.allClubs} />
                     </SelectTrigger>
-                    <SelectContent className="broadcast-glass border-white/10 rounded-2xl">
-                      <SelectItem value="ALL">{language === 'es' ? 'TODAS' : 'ALL'}</SelectItem>
-                      {nationalities.map(n => (
-                         <SelectItem key={n} value={n} className="font-oswald font-black italic">{n}</SelectItem>
+                    <SelectContent className="broadcast-glass border-white/10 rounded-2xl max-h-[min(280px,50vh)] overflow-y-auto">
+                      <SelectItem value="ALL">{t.allClubs}</SelectItem>
+                      {clubs.map((c) => (
+                        <SelectItem key={c} value={c} className="font-oswald font-black italic text-xs">
+                          {c}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -244,6 +367,46 @@ export function Search() {
                     max={99} 
                     step={1}
                     onValueChange={(vals) => setFilters(prev => ({...prev, minRating: (vals as number[])[0]}))}
+                    className="py-4"
+                  />
+                </div>
+
+                <div className="space-y-5 pt-4">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 font-barlow italic">
+                      {t.maxOvr}
+                    </label>
+                    <span className="text-4xl font-oswald font-black text-primary italic">
+                      {filters.maxRating >= 99 ? t.any : filters.maxRating}
+                    </span>
+                  </div>
+                  <Slider
+                    value={[filters.maxRating]}
+                    max={99}
+                    step={1}
+                    onValueChange={(vals) =>
+                      setFilters((prev) => ({ ...prev, maxRating: (vals as number[])[0] }))
+                    }
+                    className="py-4"
+                  />
+                </div>
+
+                <div className="space-y-5 pt-4">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 font-barlow italic">
+                      {t.minPrice}
+                    </label>
+                    <span className="text-4xl font-oswald font-black text-primary italic">
+                      {filters.minPrice === 0 ? t.any : `$${filters.minPrice}M`}
+                    </span>
+                  </div>
+                  <Slider
+                    value={[filters.minPrice]}
+                    max={300}
+                    step={5}
+                    onValueChange={(vals) =>
+                      setFilters((prev) => ({ ...prev, minPrice: (vals as number[])[0] }))
+                    }
                     className="py-4"
                   />
                 </div>
@@ -273,7 +436,7 @@ export function Search() {
               <div className="flex items-center gap-4">
                  <div className="w-12 h-1 bg-primary shadow-[0_0_10px_oklch(var(--primary))]" />
                  <span className="text-xs font-oswald font-black uppercase tracking-[0.5em] text-primary italic">
-                  {status === 'pending' ? 'ANALYZING MARKET...' : `${players.length} PROSPECTOS DETECTADOS`}
+                  {prospectsLabel}
                  </span>
               </div>
             </div>
