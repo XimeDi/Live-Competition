@@ -1,13 +1,16 @@
 import { Trophy, Star, Shield, LogOut } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useSquadStore, getPositionForIndex } from '@/store/useSquadStore'
 import { useNavigate } from 'react-router-dom'
+import { fetchPointsBreakdown } from '@/services/api/auth'
 
 export function Profile() {
-  const { user, logout } = useAuthStore()
+  const { user, logout, token } = useAuthStore()
   const { players, formation, budget } = useSquadStore()
   const navigate = useNavigate()
 
@@ -17,18 +20,17 @@ export function Profile() {
     ? (activePlayers.reduce((sum, p) => sum + (p?.rating ?? 0), 0) / activePlayers.length).toFixed(1)
     : '—'
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
     navigate('/login')
   }
 
-  // Mock match breakdown
-  const matchBreakdown = [
-    { match: 'USA vs Mexico', points: 42 },
-    { match: 'Brazil vs Argentina', points: 38 },
-    { match: 'France vs Germany', points: 55 },
-    { match: 'Spain vs Portugal', points: 29 },
-  ]
+  const { data: breakdownData, isLoading: breakdownLoading } = useQuery({
+    queryKey: ['points-breakdown', token],
+    queryFn: () => fetchPointsBreakdown(token!),
+    enabled: Boolean(token),
+    staleTime: 30_000,
+  })
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
@@ -201,31 +203,54 @@ export function Profile() {
             <CardDescription className="font-oswald font-black text-sm text-foreground/30 uppercase tracking-[0.3em] italic">Historical Performance Summary</CardDescription>
           </CardHeader>
           <CardContent className="p-10 pt-0">
-            <div className="grid gap-6">
-              {matchBreakdown.map((m, i) => (
-                <motion.div
-                  key={m.match}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.1 * i }}
-                  className="flex items-center justify-between rounded-2xl border-2 border-white/5 p-6 hover:bg-foreground/5 hover:border-primary/20 transition-all group"
-                >
-                  <div className="flex items-center gap-6">
-                    <div className="h-12 w-12 rounded-xl bg-foreground/5 flex items-center justify-center font-oswald font-black text-foreground/20">{(i+1).toString().padStart(2, '0')}</div>
-                    <span className="text-2xl font-oswald font-black italic text-foreground group-hover:text-primary transition-colors tracking-tighter uppercase">{m.match}</span>
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-oswald font-black text-primary drop-shadow-[0_0_10px_oklch(var(--primary)/0.4)]">+{m.points}</span>
-                    <span className="text-xs font-oswald font-black text-primary/30 uppercase italic">Credits</span>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+            {breakdownLoading ? (
+              <div className="grid gap-6">
+                {[1,2,3].map(i => <Skeleton key={i} className="h-24 rounded-2xl" />)}
+              </div>
+            ) : (breakdownData?.history ?? []).length === 0 ? (
+              <p className="text-center text-foreground/30 font-oswald font-black italic text-xl py-10">
+                No matches played yet. Check back after the first match!
+              </p>
+            ) : (
+              <div className="grid gap-6">
+                {(breakdownData?.history ?? []).map((m, i) => (
+                  <motion.div
+                    key={`${m.matchId}-${i}`}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.05 * i }}
+                    className="rounded-2xl border-2 border-white/5 p-6 hover:bg-foreground/5 hover:border-primary/20 transition-all group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-6">
+                        <div className="h-12 w-12 rounded-xl bg-foreground/5 flex items-center justify-center font-oswald font-black text-foreground/20">{(i+1).toString().padStart(2, '0')}</div>
+                        <span className="text-2xl font-oswald font-black italic text-foreground group-hover:text-primary transition-colors tracking-tighter uppercase">
+                          {m.teamA} <span className="text-foreground/40">{m.scoreA}–{m.scoreB}</span> {m.teamB}
+                        </span>
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-oswald font-black text-primary drop-shadow-[0_0_10px_oklch(var(--primary)/0.4)]">+{m.pointsEarned}</span>
+                        <span className="text-xs font-oswald font-black text-primary/30 uppercase italic">pts</span>
+                      </div>
+                    </div>
+                    {m.playersRewarded.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2 pl-[72px]">
+                        {m.playersRewarded.map((pr, pi) => (
+                          <span key={pi} className="text-[10px] bg-primary/10 text-primary rounded-full px-3 py-1 font-barlow font-bold">
+                            {pr.name} +{pr.points}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </motion.div>
+                ))}
+              </div>
+            )}
             <div className="mt-12 pt-8 border-t-4 border-primary/20 flex justify-between items-center">
               <span className="text-3xl font-oswald font-black italic text-foreground/40 uppercase tracking-widest">AGGREGATE SCORE</span>
               <div className="flex items-baseline gap-3">
                 <span className="text-6xl font-oswald font-black italic text-primary drop-shadow-[0_0_20px_oklch(var(--primary))]">
-                  {matchBreakdown.reduce((s, m) => s + m.points, 0)}
+                  {user?.points ?? 0}
                 </span>
                 <span className="text-2xl font-oswald font-black text-primary/40 uppercase italic tracking-tighter">Global Points</span>
               </div>

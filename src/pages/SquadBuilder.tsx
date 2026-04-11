@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useEffect, useRef } from 'react'
 import { Plus, Trash2, Settings, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CardContent } from '@/components/ui/card'
@@ -7,15 +8,25 @@ import type { Formation } from '@/store/useSquadStore'
 import { Button } from '@/components/ui/button'
 import { useUiStore } from "@/store/useUiStore"
 import { translations } from "@/lib/translations"
+import { useAuthStore } from "@/store/useAuthStore"
 
 const FORMATIONS: Formation[] = ["4-3-3", "4-4-2", "3-5-2"]
 
 export function SquadBuilder() {
-  const { formation, players, budget, setFormation, removePlayer, getIsComplete } = useSquadStore()
+  const { formation, players, budget, setFormation, removePlayer, getIsComplete, syncToBackend } = useSquadStore()
   const { language } = useUiStore()
   const t = translations[language].squad
+  const { token } = useAuthStore()
 
   const isComplete = getIsComplete()
+
+  // Auto-save squad to backend whenever it changes (F3.7).
+  const isFirstRender = useRef(true)
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return }
+    if (!token) return
+    void syncToBackend(token)
+  }, [players, formation, token, syncToBackend])
 
   return (
     <div className="space-y-8 pb-20 animate-in fade-in duration-700">

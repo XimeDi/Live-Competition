@@ -10,6 +10,7 @@ import { Search } from "./pages/Search"
 import { SquadBuilder } from "./pages/SquadBuilder"
 import { Leaderboard } from "./pages/Leaderboard"
 import { Profile } from "./pages/Profile"
+import { Admin } from "./pages/Admin"
 
 const router = createBrowserRouter([
   {
@@ -25,6 +26,7 @@ const router = createBrowserRouter([
   },
   { path: "/login", element: <PageTransition><Login /></PageTransition> },
   { path: "/register", element: <PageTransition><Register /></PageTransition> },
+  { path: "/admin", element: <Admin /> },
 ])
 
 import { Toaster } from 'sonner'

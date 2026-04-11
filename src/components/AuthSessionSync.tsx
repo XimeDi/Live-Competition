@@ -1,6 +1,7 @@
 import { useEffect } from "react"
 import { fetchCurrentUser } from "@/services/api/auth"
 import { useAuthStore } from "@/store/useAuthStore"
+import { useSquadStore } from "@/store/useSquadStore"
 
 export function AuthSessionSync() {
   useEffect(() => {
@@ -12,9 +13,13 @@ export function AuthSessionSync() {
       if (!token) return
       try {
         const user = await fetchCurrentUser(token)
-        if (!cancelled) login(user, token)
+        if (!cancelled) {
+          login(user, token)
+          // Restore squad from server (F3.7).
+          void useSquadStore.getState().restoreFromBackend(token)
+        }
       } catch {
-        if (!cancelled) logout()
+        if (!cancelled) await logout()
       }
     })()
     return () => {

@@ -1,7 +1,12 @@
 import jwt, { type SignOptions } from "jsonwebtoken"
+import { randomUUID } from "node:crypto"
 
 export type AccessTokenPayload = {
   sub: string
+  /** JWT ID — used for logout denylist (F1.5). */
+  jti: string
+  /** Expiration as Unix epoch seconds. */
+  exp: number
 }
 
 function getSecret(): string {
@@ -14,14 +19,24 @@ function getSecret(): string {
 
 export function signAccessToken(userId: string): string {
   const expiresIn = (process.env.JWT_EXPIRES_IN ?? "30d") as SignOptions["expiresIn"]
-  const options: SignOptions = { expiresIn }
+  const options: SignOptions = { expiresIn, jwtid: randomUUID() }
   return jwt.sign({ sub: userId }, getSecret(), options)
 }
 
 export function verifyAccessToken(token: string): AccessTokenPayload {
-  const decoded = jwt.verify(token, getSecret()) as jwt.JwtPayload & { sub?: string }
+  const decoded = jwt.verify(token, getSecret()) as jwt.JwtPayload & {
+    sub?: string
+    jti?: string
+    exp?: number
+  }
   if (typeof decoded.sub !== "string" || !decoded.sub) {
     throw new Error("Invalid token payload")
   }
-  return { sub: decoded.sub }
+  if (typeof decoded.jti !== "string" || !decoded.jti) {
+    throw new Error("Token missing jti")
+  }
+  if (typeof decoded.exp !== "number") {
+    throw new Error("Token missing exp")
+  }
+  return { sub: decoded.sub, jti: decoded.jti, exp: decoded.exp }
 }

@@ -1,6 +1,7 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type { Player, Position } from "@/types"
+import { fetchSquad, saveSquad } from "@/services/api/squad"
 
 export type Formation = "4-3-3" | "4-4-2" | "3-5-2"
 
@@ -12,6 +13,10 @@ export interface SquadState {
   addPlayer: (index: number, player: Player) => string | null
   removePlayer: (index: number) => void
   getIsComplete: () => boolean
+  /** Persist current squad to the server. */
+  syncToBackend: (token: string) => Promise<void>
+  /** Load squad from server (called on login / app init). */
+  restoreFromBackend: (token: string) => Promise<void>
 }
 
 const INITIAL_BUDGET = 1000.0
@@ -108,7 +113,29 @@ export const useSquadStore = create<SquadState>()(
       getIsComplete: () => {
         const state = get()
         return state.players.every(p => p !== null)
-      }
+      },
+
+      syncToBackend: async (token) => {
+        const { formation, players } = get()
+        try {
+          await saveSquad(token, formation, players)
+        } catch {
+          // Non-fatal: squad is still saved locally via Zustand persist.
+        }
+      },
+
+      restoreFromBackend: async (token) => {
+        try {
+          const { squad } = await fetchSquad(token)
+          if (!squad) return
+          const formation = squad.formation as Formation
+          const players = squad.players as (Player | null)[]
+          const spent = players.reduce((acc, p) => acc + (p?.price ?? 0), 0)
+          set({ formation, players, budget: INITIAL_BUDGET - spent })
+        } catch {
+          // Keep local state if server unavailable.
+        }
+      },
     }),
     {
       name: "fantasy-squad-storage-v2",

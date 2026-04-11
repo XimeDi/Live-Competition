@@ -1,10 +1,12 @@
 import type { FastifyInstance } from "fastify"
 import { z } from "zod"
-import { signAccessToken } from "../lib/jwt.js"
+import { signAccessToken, verifyAccessToken } from "../lib/jwt.js"
 import { syncLeaderboardScore } from "../lib/leaderboard.js"
 import { hashPassword, verifyPassword } from "../lib/password.js"
 import { createUserInStore, findUserByEmail } from "../lib/userStore.js"
 import { toPublicUser } from "../lib/user.js"
+import { denyToken } from "../lib/tokenDenylist.js"
+import { requireAuth } from "../middleware/requireAuth.js"
 
 const registerBody = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
@@ -53,5 +55,18 @@ export async function authRoutes(app: FastifyInstance) {
     await syncLeaderboardScore(user.id, user.points)
     const token = signAccessToken(user.id)
     return reply.send({ user: toPublicUser(user), token })
+  })
+
+  /** F1.5 — invalidate the current Bearer token so it can't be reused. */
+  app.post("/logout", { preHandler: requireAuth }, async (request, reply) => {
+    const header = request.headers.authorization ?? ""
+    const token = header.slice("Bearer ".length).trim()
+    try {
+      const { jti, exp } = verifyAccessToken(token)
+      await denyToken(jti, exp)
+    } catch {
+      // If the token is already invalid, logout silently succeeds.
+    }
+    return reply.send({ ok: true })
   })
 }

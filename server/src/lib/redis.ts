@@ -8,13 +8,25 @@ function getRedisUrl(): string {
   return url
 }
 
-const globalForRedis = globalThis as unknown as { redis: Redis | undefined }
+const globalForRedis = globalThis as unknown as { redis?: Redis }
 
-export const redis: Redis = globalForRedis.redis ?? new Redis(getRedisUrl(), { maxRetriesPerRequest: 3 })
-
-if (process.env.NODE_ENV !== "production") {
-  globalForRedis.redis = redis
+function createRedis(): Redis {
+  const client = new Redis(getRedisUrl(), {
+    lazyConnect: true,
+    maxRetriesPerRequest: 3,
+    retryStrategy(times) {
+      if (times > 8) return null
+      return Math.min(times * 150, 2000)
+    },
+  })
+  client.on("error", () => {
+    /* Avoid ioredis "Unhandled error event" spam; startup uses pingRedis() */
+  })
+  return client
 }
+
+export const redis: Redis = globalForRedis.redis ?? createRedis()
+globalForRedis.redis = redis
 
 export async function pingRedis(): Promise<boolean> {
   try {

@@ -1,5 +1,6 @@
 import type { FastifyReply, FastifyRequest } from "fastify"
 import { verifyAccessToken } from "../lib/jwt.js"
+import { isTokenDenied } from "../lib/tokenDenylist.js"
 
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
   const header = request.headers.authorization
@@ -11,7 +12,10 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply) 
     return reply.status(401).send({ error: "Unauthorized" })
   }
   try {
-    const { sub } = verifyAccessToken(token)
+    const { sub, jti } = verifyAccessToken(token)
+    if (await isTokenDenied(jti)) {
+      return reply.status(401).send({ error: "Token revoked" })
+    }
     request.userId = sub
   } catch {
     return reply.status(401).send({ error: "Unauthorized" })
