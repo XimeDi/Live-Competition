@@ -3,6 +3,12 @@ import { addUserPoints } from "./userStore.js"
 import { syncLeaderboardScore } from "./leaderboard.js"
 import { MatchEventModel } from "./models/MatchEvent.js"
 
+/**
+ * F4.2 — points per player:
+ *   Win  → +3
+ *   Draw → +1
+ *   Loss → +0
+ */
 function calcPointsForPlayer(
   homeScore: number,
   awayScore: number,
@@ -17,16 +23,9 @@ function calcPointsForPlayer(
   const myScore = isHome ? homeScore : awayScore
   const oppScore = isHome ? awayScore : homeScore
 
-  // Participation
-  let pts = 2
-  // Result
-  if (myScore > oppScore) pts += 6
-  else if (myScore === oppScore) pts += 3
-  else pts += 1
-  // Goals scored by the player's team
-  pts += myScore * 2
-
-  return pts
+  if (myScore > oppScore) return 3   // win
+  if (myScore === oppScore) return 1 // draw
+  return 0                           // loss
 }
 
 export async function calculateMatchPoints(

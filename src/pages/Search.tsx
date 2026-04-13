@@ -46,9 +46,11 @@ const SORT_LABELS_ES: Record<SortOption, string> = {
 const DEFAULT_FILTERS: SearchFilters = {
   query: '',
   minRating: 0,
+  maxRating: 99,
+  minPrice: 0,
   maxPrice: 300,
   position: 'ALL',
-  nationality: '',
+  nationalities: [],
   club: '',
   sortBy: 'rating_desc',
 }
@@ -85,7 +87,7 @@ export function Search() {
 
   const activeFilterCount = [
     filters.position !== 'ALL' && filters.position,
-    filters.nationality,
+    filters.nationalities.length > 0,
     filters.club,
     filters.minRating > 0,
     filters.maxPrice < 300,
@@ -283,8 +285,8 @@ export function Search() {
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-foreground/50 uppercase tracking-widest">{t.nationality}</label>
                   <Select
-                    value={filters.nationality || 'ALL'}
-                    onValueChange={val => setFilters(prev => ({ ...prev, nationality: val === 'ALL' ? undefined : (val ?? undefined) }))}
+                    value={filters.nationalities[0] || 'ALL'}
+                    onValueChange={val => setFilters(prev => ({ ...prev, nationalities: val === 'ALL' ? [] : [val as string] }))}
                   >
                     <SelectTrigger className="h-10 bg-background/60 border-border/60 rounded-xl text-sm">
                       <SelectValue placeholder={t.allNations} />
@@ -303,7 +305,7 @@ export function Search() {
                   <label className="text-xs font-semibold text-foreground/50 uppercase tracking-widest">{t.club}</label>
                   <Select
                     value={filters.club || 'ALL'}
-                    onValueChange={val => setFilters(prev => ({ ...prev, club: val === 'ALL' ? undefined : (val ?? undefined) }))}
+                    onValueChange={val => setFilters(prev => ({ ...prev, club: val === 'ALL' ? '' : (val ?? '') }))}
                   >
                     <SelectTrigger className="h-10 bg-background/60 border-border/60 rounded-xl text-sm">
                       <SelectValue placeholder={t.allClubs} />

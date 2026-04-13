@@ -29,20 +29,14 @@ export async function userRoutes(app: FastifyInstance) {
     }
   )
 
-  /**
-   * F4.8 — points breakdown per match for the authenticated user.
-   *
-   * Data source: MongoDB MatchEvent collection (indexed on userBreakdowns.userId).
-   * Also returns all matches from PostgreSQL so the UI can show matches where
-   * the user earned 0 points.
-   */
+  // Desglose de puntos por partido del usuario autenticado (F4.8)
   app.get(
     "/user/me/points-breakdown",
     { preHandler: requireAuth },
     async (request, reply) => {
       const userId = request.userId!
 
-      // Fetch all finished matches from PostgreSQL (authoritative schedule)
+      // Partidos finalizados desde PostgreSQL (fuente de verdad)
       const allMatches = await db.match.findMany({
         where: { status: "finished" },
         orderBy: { createdAt: "desc" },
@@ -58,7 +52,7 @@ export async function userRoutes(app: FastifyInstance) {
         },
       })
 
-      // Fetch this user's scoring events from MongoDB
+      // Eventos de puntuación del usuario desde MongoDB
       const events = await MatchEventModel.find(
         { "userBreakdowns.userId": userId },
         {
@@ -74,7 +68,7 @@ export async function userRoutes(app: FastifyInstance) {
         .sort({ scoredAt: -1 })
         .lean()
 
-      // Shape the response to match what the frontend expects
+      // Formatea la respuesta para el frontend
       const history = events.map((ev) => {
         const breakdown = ev.userBreakdowns[0]
         return {

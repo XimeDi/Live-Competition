@@ -1,17 +1,9 @@
 /**
- * MongoDB MatchEvent model.
- *
- * Every time an admin finalises a match result, a MatchEvent document is
- * written here with the complete per-user points breakdown (F4.8).
- *
- * Why MongoDB for this instead of PostgreSQL?
- *   • The shape varies per match (different numbers of affected users / players).
- *   • It is append-only — an immutable audit log — which suits a document store.
- *   • Reading a user's full history is a single indexed query on userId.
- *   • PostgreSQL already holds the authoritative match schedule/score; MongoDB
- *     holds the derived *scoring event* with rich nested breakdowns.
+ * Modelo MongoDB para eventos de puntuación (F4.8).
+ * Cada vez que un admin finaliza un partido, se guarda el desglose de puntos por usuario.
+ * Se usa MongoDB porque la estructura varía por partido y sirve como log inmutable de auditoría.
  */
-import mongoose, { Schema, model, models } from "mongoose"
+import mongoose, { Schema, model } from "mongoose"
 import type { Document } from "mongoose"
 
 export interface IPlayerPoints {
@@ -27,7 +19,7 @@ export interface IUserBreakdown {
 }
 
 export interface IMatchEvent extends Document {
-  matchId: string          // references PostgreSQL matches.id
+  matchId: string          // referencia al id del partido en PostgreSQL
   homeTeam: string
   awayTeam: string
   homeNationality: string
@@ -75,10 +67,10 @@ const MatchEventSchema = new Schema<IMatchEvent>(
   { timestamps: false }
 )
 
-// Index for the per-user history query (F4.8)
+// Índice para consultas de historial por usuario (F4.8)
 MatchEventSchema.index({ "userBreakdowns.userId": 1 })
 MatchEventSchema.index({ scoredAt: -1 })
 
 export const MatchEventModel = (
-  "MatchEvent" in models ? models["MatchEvent"] : model("MatchEvent", MatchEventSchema)
+  mongoose.models["MatchEvent"] ?? model("MatchEvent", MatchEventSchema)
 ) as mongoose.Model<IMatchEvent>

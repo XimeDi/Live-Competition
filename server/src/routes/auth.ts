@@ -57,7 +57,7 @@ export async function authRoutes(app: FastifyInstance) {
     return reply.send({ user: toPublicUser(user), token })
   })
 
-  /** F1.5 — invalidate the current Bearer token so it can't be reused. */
+  // Cierra sesión invalidando el token actual en Redis (F1.5)
   app.post("/logout", { preHandler: requireAuth }, async (request, reply) => {
     const header = request.headers.authorization ?? ""
     const token = header.slice("Bearer ".length).trim()
@@ -65,7 +65,7 @@ export async function authRoutes(app: FastifyInstance) {
       const { jti, exp } = verifyAccessToken(token)
       await denyToken(jti, exp)
     } catch {
-      // If the token is already invalid, logout silently succeeds.
+      // Si el token ya es inválido, el logout se ignora
     }
     return reply.send({ ok: true })
   })

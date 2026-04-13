@@ -2,7 +2,7 @@ import type { Player, SearchFilters, PaginatedResponse, SortOption } from '@/typ
 import playersData from '@/data/players.json'
 
 const ALL_PLAYERS: Player[] = (playersData as any[]).map(p => {
-  // Use a proxy to bypass ORB/CORS and ensure images load correctly
+  // Proxy para evitar errores de CORS en las imágenes
   const photoUrl = p.photo.replace('https://', '')
   return {
     ...p,
@@ -14,9 +14,9 @@ const ALL_PLAYERS: Player[] = (playersData as any[]).map(p => {
 export const getPlayers = async (
   filters: SearchFilters,
   pageParam = 1,
-  limit = 12 // Increased to match the 3-column layout better
+  limit = 12 // Ajustado para la grilla de 3 columnas
 ): Promise<PaginatedResponse<Player>> => {
-  // Simulate network delay (reduced for snappier UX)
+  // Simula latencia de red
   await new Promise((resolve) => setTimeout(resolve, 200))
 
   let filtered = [...ALL_PLAYERS]
@@ -28,8 +28,8 @@ export const getPlayers = async (
     )
   }
 
-  if (filters.nationality) {
-    filtered = filtered.filter(p => p.nationality === filters.nationality)
+  if (filters.nationalities && filters.nationalities.length > 0) {
+    filtered = filtered.filter(p => filters.nationalities.includes(p.nationality))
   }
 
   if (filters.position && filters.position !== 'ALL') {
@@ -48,7 +48,7 @@ export const getPlayers = async (
     filtered = filtered.filter(p => p.price <= filters.maxPrice)
   }
 
-  // Sort
+  // Ordena según el criterio seleccionado
   const sort: SortOption = filters.sortBy ?? 'rating_desc'
   filtered.sort((a, b) => {
     switch (sort) {
@@ -60,7 +60,7 @@ export const getPlayers = async (
     }
   })
 
-  // Pagination logic
+  // Paginación
   const startIndex = (pageParam - 1) * limit
   const endIndex = startIndex + limit
   const data = filtered.slice(startIndex, endIndex)
@@ -74,7 +74,7 @@ export const getPlayers = async (
   }
 }
 
-// Helpers for the filters
+// Helpers para poblar los filtros
 export const getNationalities = () => {
   const nats = new Set(ALL_PLAYERS.map(p => p.nationality))
   return Array.from(nats).sort()

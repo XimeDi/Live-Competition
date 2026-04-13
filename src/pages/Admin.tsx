@@ -478,8 +478,7 @@ function AdminPanel({ adminSecret, onLogout }: { adminSecret: string; onLogout: 
         {/* Legend */}
         <div className="rounded-2xl border border-border/40 bg-card/30 px-6 py-4 text-xs text-foreground/40 space-y-1">
           <p className="font-semibold text-foreground/60 mb-2">Sistema de puntos</p>
-          <p>⚽ Participación: +2 pts · Victoria: +6 pts · Empate: +3 pts · Derrota: +1 pt</p>
-          <p>🎯 Goles del equipo: +2 pts por gol</p>
+          <p>🏆 Victoria: +3 pts por jugador · 🤝 Empate: +1 pt por jugador · ❌ Derrota: +0 pts</p>
           <p>Los puntos se distribuyen automáticamente a todos los usuarios con jugadores de las selecciones que juegan.</p>
         </div>
       </div>

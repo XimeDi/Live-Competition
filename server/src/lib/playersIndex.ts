@@ -9,7 +9,7 @@ const TASK_TIMEOUT_MS = 600_000 as const
 export type MeiliPlayerDoc = {
   id: string
   name: string
-  /** Accent-folded name for fuzzy / unaccented typing (F2.2) */
+  /** Nombre sin acentos para búsqueda fuzzy (F2.2). */
   nameNormalized: string
   photo: string
   nationality: string
@@ -29,7 +29,7 @@ function meiliQuoteString(s: string): string {
   return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`
 }
 
-/** F2.2: match "Mbappe" to "Mbappé" etc. */
+/** Elimina acentos para que "Mbappe" encuentre "Mbappé" (F2.2). */
 function normalizeForSearch(s: string): string {
   return s
     .normalize("NFD")
@@ -106,13 +106,9 @@ export async function indexAllPlayersFromFile(): Promise<number> {
   return docs.length
 }
 
-// ─── MongoDB helpers ──────────────────────────────────────────────────────────
+// ─── Helpers de MongoDB ───────────────────────────────────────────────────────
 
-/**
- * Seed the MongoDB players collection from the disk JSON (one-time operation).
- * Uses ordered:false bulk insert so duplicate-key errors are silently skipped,
- * making re-runs safe without a full drop/recreate.
- */
+/** Carga jugadores del JSON al disco y los inserta en MongoDB (idempotente). */
 export async function seedPlayersToMongo(): Promise<number> {
   const docs = await loadPlayersFromDisk()
   let inserted = 0
@@ -127,10 +123,7 @@ export async function seedPlayersToMongo(): Promise<number> {
   return inserted
 }
 
-/**
- * Load all players from MongoDB (used as source of truth when Meilisearch
- * needs to be re-indexed without touching the disk JSON again).
- */
+/** Lee todos los jugadores desde MongoDB (fuente de verdad para re-indexar Meilisearch). */
 export async function loadPlayersFromMongo(): Promise<MeiliPlayerDoc[]> {
   const docs = await PlayerModel.find({}).lean()
   return docs.map((p) => ({
@@ -146,9 +139,7 @@ export async function loadPlayersFromMongo(): Promise<MeiliPlayerDoc[]> {
   }))
 }
 
-/**
- * Get a single player by id from MongoDB (fast O(1) look-up by _id).
- */
+/** Busca un jugador por id en MongoDB (O(1) por _id). */
 export async function getPlayerById(id: string): Promise<MeiliPlayerDoc | null> {
   const p = await PlayerModel.findById(id).lean()
   if (!p) return null
@@ -165,26 +156,23 @@ export async function getPlayerById(id: string): Promise<MeiliPlayerDoc | null> 
   }
 }
 
-/**
- * Bootstrap: ensure MongoDB has players, then ensure Meilisearch is indexed.
- * MongoDB is seeded first (source of truth); Meilisearch is seeded from it.
- */
+/** Inicializa MongoDB con jugadores y luego indexa Meilisearch desde ahí (idempotente). */
 export async function bootstrapPlayersIndexIfEmpty(): Promise<void> {
   if (process.env.SKIP_PLAYER_INDEX === "1") {
     return
   }
 
-  // 1. Ensure MongoDB players collection is populated
+  // 1. Pobla MongoDB si está vacío
   const mongoCount = await PlayerModel.estimatedDocumentCount()
   if (mongoCount === 0) {
     await seedPlayersToMongo()
   }
 
-  // 2. Ensure Meilisearch index exists and has correct settings
+  // 2. Crea el índice de Meilisearch y aplica configuración
   await ensurePlayersIndexExists()
   await applyPlayersIndexSettings()
 
-  // 3. Index from MongoDB → Meilisearch if empty
+  // 3. Indexa desde MongoDB → Meilisearch si está vacío
   const index = meili.index(PLAYERS_INDEX_UID)
   const stats = await index.getStats()
   if (stats.numberOfDocuments > 0) {
@@ -270,7 +258,7 @@ export function buildSearchFilter(input: {
   return parts.join(" AND ")
 }
 
-/** F2.1: Meilisearch text query only from 2+ chars; 0–1 char uses empty query (browse + filters). */
+/** Búsqueda activa solo desde 2 caracteres; con menos devuelve query vacío (F2.1). */
 function resolveSearchQuery(q: string): string {
   const t = q.trim()
   if (t.length < 2) return ""

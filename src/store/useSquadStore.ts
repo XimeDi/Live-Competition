@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type { Player, Position } from "@/types"
-import { saveSquad } from "@/services/api/squad"
+import { saveSquad, fetchSquad } from "@/services/api/squad"
 
 export type Formation = "4-3-3" | "4-4-2" | "3-5-2"
 
@@ -14,6 +14,7 @@ export interface SquadState {
   removePlayer: (index: number) => void
   getIsComplete: () => boolean
   syncToServer: (token: string) => Promise<void>
+  restoreFromBackend: (token: string) => Promise<void>
 }
 
 const INITIAL_BUDGET = 1000.0
@@ -102,7 +103,23 @@ export const useSquadStore = create<SquadState>()(
         return state.players.every((p) => p !== null)
       },
 
-      /** Push the current squad to the backend. Call after any mutation when authenticated. */
+      /** Restaura el equipo desde el backend al iniciar sesión (F3.7). */
+      restoreFromBackend: async (token: string) => {
+        try {
+          const { squad } = await fetchSquad(token)
+          if (!squad) return
+          const restored = squad.players.map((p) =>
+            p
+              ? ({ id: p.id, name: p.name, nationality: p.nationality, position: p.position, photo: "", club: "", rating: 0, price: 0 } as Player)
+              : null
+          )
+          set({ formation: squad.formation as Formation, players: restored, budget: squad.budget })
+        } catch {
+          // No es fatal: se mantiene el estado local
+        }
+      },
+
+      /** Sincroniza el equipo actual con el backend tras cualquier cambio. */
       syncToServer: async (token: string) => {
         const { formation, budget, players } = get()
         try {
@@ -116,7 +133,7 @@ export const useSquadStore = create<SquadState>()(
             ),
           })
         } catch {
-          // Non-fatal — local state is still the source of truth for the UI
+          // No es fatal: el estado local sigue siendo la fuente de verdad para la UI
         }
       },
     }),

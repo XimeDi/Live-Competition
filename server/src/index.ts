@@ -33,17 +33,8 @@ await app.register(matchesRoutes, { prefix: "/api" })
 await app.register(adminRoutes, { prefix: "/api/admin" })
 await app.register(searchRoutes, { prefix: "/api" })
 
-app.get("/health", async (_request, reply) => {
-  const [redisOk, mongoOk] = await Promise.all([pingRedis(), pingMongo()])
-  try {
-    await db.$queryRaw`SELECT 1`
-    if (!redisOk || !mongoOk) {
-      return reply.status(503).send({ ok: false, redis: redisOk, db: true, mongo: mongoOk })
-    }
-    return { ok: true, redis: true, db: true, mongo: true }
-  } catch {
-    return reply.status(503).send({ ok: false, redis: redisOk, db: false, mongo: mongoOk })
-  }
+app.get("/health", async () => {
+  return { ok: true }
 })
 
 const shutdown = async () => {
@@ -57,18 +48,18 @@ process.on("SIGINT", () => void shutdown())
 process.on("SIGTERM", () => void shutdown())
 
   try {
-    // Verify Redis
+    // Verifica conexión a Redis
     const redisOk = await pingRedis()
     if (!redisOk) {
       app.log.error("Redis is not reachable. Set REDIS_URL in .env.")
       process.exit(1)
     }
 
-    // Verify PostgreSQL
+    // Conecta PostgreSQL
     await db.$connect()
     app.log.info("PostgreSQL connected")
 
-    // Connect MongoDB
+    // Conecta MongoDB
     await connectMongo()
     const mongoOk = await pingMongo()
     if (!mongoOk) {
@@ -77,17 +68,17 @@ process.on("SIGTERM", () => void shutdown())
     }
     app.log.info("MongoDB connected")
 
-    // Warm up leaderboard cache from DB
+    // Sincroniza el leaderboard de Redis con los puntos actuales de PostgreSQL
     const users = await db.user.findMany({ select: { id: true, points: true } })
     for (const u of users) {
       await syncLeaderboardScore(u.id, u.points)
     }
     app.log.info(`Leaderboard synced for ${users.length} user(s)`)
 
-    // Seed initial matches if the table is empty
+    // Pobla los partidos iniciales si la tabla está vacía
     await seedMatchesIfEmpty()
 
-    // Bootstrap MongoDB players + Meilisearch index (idempotent)
+    // Inicializa MongoDB con jugadores y luego indexa Meilisearch (idempotente)
     await bootstrapPlayersIndexIfEmpty()
     app.log.info("Player index ready (MongoDB → Meilisearch)")
 

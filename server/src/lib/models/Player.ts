@@ -10,7 +10,7 @@
  * (e.g. fetch a single player by id from a squad page) without hitting
  * Meilisearch.
  */
-import mongoose, { Schema, model, models } from "mongoose"
+import mongoose, { Schema, model } from "mongoose"
 
 export interface IPlayer {
   _id: string        // same string id used everywhere ("12345")
@@ -46,5 +46,5 @@ PlayerSchema.index({ nameNormalized: "text" })
 
 // Prevent model re-compilation on hot reload (tsx watch)
 export const PlayerModel = (
-  "Player" in models ? models["Player"] : model("Player", PlayerSchema)
+  mongoose.models["Player"] ?? model("Player", PlayerSchema)
 ) as mongoose.Model<IPlayer>

@@ -17,7 +17,7 @@ const squadBody = z.object({
 })
 
 export async function squadRoutes(app: FastifyInstance) {
-  // GET /api/squad — fetch current user's saved squad
+  // Obtiene el equipo guardado del usuario autenticado
   app.get("/squad", { preHandler: requireAuth }, async (request, reply) => {
     const userId = request.userId!
 
@@ -30,7 +30,7 @@ export async function squadRoutes(app: FastifyInstance) {
       return reply.send({ squad: null })
     }
 
-    // Build a sparse array of 11 slots (null = empty)
+    // Arma el array de 11 slots (null = slot vacío)
     const playerSlots: (Record<string, unknown> | null)[] = Array(11).fill(null)
     for (const p of squad.players) {
       playerSlots[p.slotIndex] = {
@@ -50,7 +50,7 @@ export async function squadRoutes(app: FastifyInstance) {
     })
   })
 
-  // POST /api/squad — save (upsert) the user's squad
+  // Guarda (upsert) el equipo del usuario en PostgreSQL
   app.post("/squad", { preHandler: requireAuth }, async (request, reply) => {
     const userId = request.userId!
 
@@ -63,14 +63,14 @@ export async function squadRoutes(app: FastifyInstance) {
 
     const { formation, budget, players } = parsed.data
 
-    // Upsert the squad record
+    // Upsert del registro de equipo
     const squad = await db.squad.upsert({
       where: { userId },
       create: { userId, formation, budget },
       update: { formation, budget, updatedAt: new Date() },
     })
 
-    // Replace squad players atomically
+    // Reemplaza los jugadores del equipo de forma atómica
     await db.squadPlayer.deleteMany({ where: { squadId: squad.id } })
 
     const rows = players
