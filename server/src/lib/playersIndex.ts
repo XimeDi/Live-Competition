@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { meili, PLAYERS_INDEX_UID } from "./meilisearch.js"
+import { PlayerModel } from "./models/Player.js"
 
 const BATCH_SIZE = 8000
 const TASK_TIMEOUT_MS = 600_000 as const
@@ -105,18 +106,95 @@ export async function indexAllPlayersFromFile(): Promise<number> {
   return docs.length
 }
 
+// ─── MongoDB helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Seed the MongoDB players collection from the disk JSON (one-time operation).
+ * Uses ordered:false bulk insert so duplicate-key errors are silently skipped,
+ * making re-runs safe without a full drop/recreate.
+ */
+export async function seedPlayersToMongo(): Promise<number> {
+  const docs = await loadPlayersFromDisk()
+  let inserted = 0
+  for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+    const batch = docs.slice(i, i + BATCH_SIZE)
+    const ops = batch.map((p) => ({
+      insertOne: { document: { _id: p.id, ...p } },
+    }))
+    const result = await PlayerModel.bulkWrite(ops, { ordered: false }).catch(() => null)
+    inserted += result?.insertedCount ?? 0
+  }
+  return inserted
+}
+
+/**
+ * Load all players from MongoDB (used as source of truth when Meilisearch
+ * needs to be re-indexed without touching the disk JSON again).
+ */
+export async function loadPlayersFromMongo(): Promise<MeiliPlayerDoc[]> {
+  const docs = await PlayerModel.find({}).lean()
+  return docs.map((p) => ({
+    id: p._id as string,
+    name: p.name,
+    nameNormalized: p.nameNormalized,
+    photo: p.photo,
+    nationality: p.nationality,
+    club: p.club,
+    position: p.position,
+    rating: p.rating,
+    price: p.price,
+  }))
+}
+
+/**
+ * Get a single player by id from MongoDB (fast O(1) look-up by _id).
+ */
+export async function getPlayerById(id: string): Promise<MeiliPlayerDoc | null> {
+  const p = await PlayerModel.findById(id).lean()
+  if (!p) return null
+  return {
+    id: p._id as string,
+    name: p.name,
+    nameNormalized: p.nameNormalized,
+    photo: p.photo,
+    nationality: p.nationality,
+    club: p.club,
+    position: p.position,
+    rating: p.rating,
+    price: p.price,
+  }
+}
+
+/**
+ * Bootstrap: ensure MongoDB has players, then ensure Meilisearch is indexed.
+ * MongoDB is seeded first (source of truth); Meilisearch is seeded from it.
+ */
 export async function bootstrapPlayersIndexIfEmpty(): Promise<void> {
   if (process.env.SKIP_PLAYER_INDEX === "1") {
     return
   }
+
+  // 1. Ensure MongoDB players collection is populated
+  const mongoCount = await PlayerModel.estimatedDocumentCount()
+  if (mongoCount === 0) {
+    await seedPlayersToMongo()
+  }
+
+  // 2. Ensure Meilisearch index exists and has correct settings
   await ensurePlayersIndexExists()
   await applyPlayersIndexSettings()
+
+  // 3. Index from MongoDB → Meilisearch if empty
   const index = meili.index(PLAYERS_INDEX_UID)
   const stats = await index.getStats()
   if (stats.numberOfDocuments > 0) {
     return
   }
-  await indexAllPlayersFromFile()
+  const docs = await loadPlayersFromMongo()
+  for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+    const batch = docs.slice(i, i + BATCH_SIZE)
+    await index.addDocuments(batch).waitTask({ timeout: TASK_TIMEOUT_MS })
+  }
 }
 
 export function toPublicPhotoUrl(photo: string): string {
@@ -210,7 +288,7 @@ export async function suggestPlayerNames(
     limit,
     attributesToRetrieve: ["id", "name"],
   })
-  return (res.hits ?? []).map((h) => ({ id: String(h.id), name: h.name }))
+  return (res.hits ?? []).map((h: MeiliPlayerDoc) => ({ id: String(h.id), name: h.name }))
 }
 
 export async function searchPlayersMeili(input: {

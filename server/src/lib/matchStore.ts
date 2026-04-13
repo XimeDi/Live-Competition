@@ -8,9 +8,16 @@
  */
 import { randomUUID } from "node:crypto"
 import { redis } from "./redis.js"
-import { getAllUserIds, updateUserPoints } from "./userStore.js"
+import { addUserPoints } from "./userStore.js"
 import { syncLeaderboardScore, LEADERBOARD_KEY } from "./leaderboard.js"
 import { getSquad } from "./squadStore.js"
+
+// Stub for the getAllUserIds / updateUserPoints that were removed from userStore
+async function getAllUserIds(): Promise<string[]> {
+  const keys = await redis.smembers("users:all")
+  return keys
+}
+const updateUserPoints = addUserPoints
 
 export type MatchRecord = {
   id: string

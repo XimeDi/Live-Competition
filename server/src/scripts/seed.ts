@@ -1,12 +1,13 @@
 import "dotenv/config"
 import { hashPassword } from "../lib/password.js"
 import { createUserInStore } from "../lib/userStore.js"
-import { setUserPoints } from "../lib/userStore.js"
 import { syncLeaderboardScore } from "../lib/leaderboard.js"
 import { saveSquad } from "../lib/squadStore.js"
 import type { StoredSquadPlayer } from "../lib/squadStore.js"
-import { loadPlayersFromDisk } from "../lib/playersIndex.js"
+import { loadPlayersFromDisk, seedPlayersToMongo } from "../lib/playersIndex.js"
 import { redis } from "../lib/redis.js"
+import { connectMongo, disconnectMongo } from "../lib/mongo.js"
+import { db } from "../lib/db.js"
 
 type Formation = "4-3-3" | "4-4-2" | "3-5-2"
 
@@ -48,10 +49,20 @@ async function main() {
   const userCount = Number(process.env.SEED_USERS ?? "500")
   const password = process.env.SEED_PASSWORD ?? "password123"
 
+  // Connect MongoDB
+  await connectMongo()
+
   if (shouldFlush) {
     // WARNING: for local demos only.
     await redis.flushdb()
   }
+
+  // Seed players into MongoDB (source of truth for player data)
+  // eslint-disable-next-line no-console
+  console.log("Seeding players into MongoDB…")
+  const inserted = await seedPlayersToMongo()
+  // eslint-disable-next-line no-console
+  console.log(`MongoDB players: ${inserted} newly inserted`)
 
   const players = await loadPlayersFromDisk()
   if (players.length < 1000) {
@@ -72,8 +83,12 @@ async function main() {
     created++
 
     // Give everyone some points so the leaderboard is meaningful.
-    const pts = await setUserPoints(res.user.id, randInt(0, 120))
-    await syncLeaderboardScore(res.user.id, pts)
+    const randomPts = randInt(0, 120)
+    const updatedUser = await db.user.update({
+      where: { id: res.user.id },
+      data: { points: randomPts },
+    })
+    await syncLeaderboardScore(res.user.id, updatedUser.points)
 
     // Optional: give them a valid 11-player squad.
     const formation = pickFormation()
@@ -105,6 +120,10 @@ async function main() {
   console.log(`Seed complete. created=${created} requested=${userCount}`)
   // eslint-disable-next-line no-console
   console.log(`Login with any user: manager0001@example.com / ${password}`)
+
+  await disconnectMongo()
+  await db.$disconnect()
+  await redis.quit()
 }
 
 main().catch((err) => {

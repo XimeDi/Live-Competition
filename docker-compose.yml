@@ -33,6 +33,22 @@ services:
     ports:
       - "6379:6379"
 
+  # ── MongoDB ───────────────────────────────────────────────────────────────
+  mongodb:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: fantasy_wc
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "27017:27017"
+
   # ── Meilisearch ───────────────────────────────────────────────────────────
   meilisearch:
     image: getmeili/meilisearch:v1.8
@@ -55,9 +71,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      mongodb:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql://fantasy:fantasy@db:5432/fantasy_wc
       REDIS_URL: redis://redis:6379
+      MONGODB_URL: mongodb://mongodb:27017/fantasy_wc
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-30d}
       PORT: 3001
@@ -86,4 +105,5 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  mongo_data:
   meili_data:

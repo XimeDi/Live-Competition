@@ -91,6 +91,9 @@ export async function adminRoutes(app: FastifyInstance) {
     await db.match.update({ where: { id }, data: { homeScore, awayScore, status: "finished" } })
 
     const stats = await calculateMatchPoints(
+      id,
+      match.homeTeam,
+      match.awayTeam,
       homeScore,
       awayScore,
       match.homeNationality,
@@ -114,6 +117,9 @@ export async function adminRoutes(app: FastifyInstance) {
     await db.match.update({ where: { id }, data: { homeScore, awayScore, status: "finished" } })
 
     const stats = await calculateMatchPoints(
+      id,
+      match.homeTeam,
+      match.awayTeam,
       homeScore,
       awayScore,
       match.homeNationality,
