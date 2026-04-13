@@ -1,5 +1,5 @@
 import { redis } from "./redis.js"
-import { findUserById } from "./userStore.js"
+import { db } from "./db.js"
 
 /** Global ranking: score = fantasy points, member = user id (Redis sorted set). */
 export const LEADERBOARD_KEY = "leaderboard:global"
@@ -40,16 +40,22 @@ export async function getLeaderboardPage(
   const end = start + limit - 1
   const raw = await redis.zrevrange(LEADERBOARD_KEY, start, end, "WITHSCORES")
 
+  const userIds = raw.filter((_, i) => i % 2 === 0)
+  const users = await db.user.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true, username: true },
+  })
+  const usernameMap = new Map(users.map((u) => [u.id, u.username]))
+
   const data: LeaderboardRow[] = []
   for (let i = 0; i < raw.length; i += 2) {
     const userId = raw[i]
     const points = Number(raw[i + 1])
     const rank = start + i / 2 + 1
-    const user = await findUserById(userId)
     data.push({
       rank,
       userId,
-      username: user?.username ?? "Unknown",
+      username: usernameMap.get(userId) ?? "Unknown",
       points: Number.isFinite(points) ? Math.round(points) : 0,
     })
   }

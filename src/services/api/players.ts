@@ -1,55 +1,86 @@
-import type { Player, SearchFilters, PaginatedResponse } from '@/types'
-import { apiJson } from './client'
+import type { Player, SearchFilters, PaginatedResponse, SortOption } from '@/types'
+import playersData from '@/data/players.json'
+
+const ALL_PLAYERS: Player[] = (playersData as any[]).map(p => {
+  // Use a proxy to bypass ORB/CORS and ensure images load correctly
+  const photoUrl = p.photo.replace('https://', '')
+  return {
+    ...p,
+    id: String(p.id),
+    photo: `https://images.weserv.nl/?url=${photoUrl}&w=120&h=120&fit=cover&mask=circle`
+  }
+})
 
 export const getPlayers = async (
   filters: SearchFilters,
   pageParam = 1,
-  limit = 12
+  limit = 12 // Increased to match the 3-column layout better
 ): Promise<PaginatedResponse<Player>> => {
-  const params = new URLSearchParams()
-  params.set('page', String(pageParam))
-  params.set('limit', String(limit))
+  // Simulate network delay (reduced for snappier UX)
+  await new Promise((resolve) => setTimeout(resolve, 200))
 
-  const q = filters.query.trim()
-  if (q.length >= 2) {
-    params.set('q', q)
+  let filtered = [...ALL_PLAYERS]
+
+  if (filters.query) {
+    const q = filters.query.toLowerCase()
+    filtered = filtered.filter(
+      p => p.name.toLowerCase().includes(q) || p.club.toLowerCase().includes(q)
+    )
   }
 
-  if (filters.nationalities.length > 0) {
-    params.set('nationalities', filters.nationalities.join(','))
+  if (filters.nationality) {
+    filtered = filtered.filter(p => p.nationality === filters.nationality)
   }
-  if (filters.club) {
-    params.set('club', filters.club)
-  }
+
   if (filters.position && filters.position !== 'ALL') {
-    params.set('position', filters.position)
+    filtered = filtered.filter(p => p.position === filters.position)
   }
-  params.set('minRating', String(filters.minRating))
-  if (filters.maxRating < 99) {
-    params.set('maxRating', String(filters.maxRating))
+
+  if (filters.club) {
+    filtered = filtered.filter(p => p.club === filters.club)
   }
-  if (filters.minPrice > 0) {
-    params.set('minPrice', String(filters.minPrice))
+
+  if (filters.minRating > 0) {
+    filtered = filtered.filter(p => p.rating >= filters.minRating)
   }
-  params.set('maxPrice', String(filters.maxPrice))
 
-  return apiJson<PaginatedResponse<Player>>(`/api/search?${params}`, { method: 'GET' })
+  if (filters.maxPrice > 0) {
+    filtered = filtered.filter(p => p.price <= filters.maxPrice)
+  }
+
+  // Sort
+  const sort: SortOption = filters.sortBy ?? 'rating_desc'
+  filtered.sort((a, b) => {
+    switch (sort) {
+      case 'rating_asc':  return a.rating - b.rating
+      case 'price_desc':  return b.price - a.price
+      case 'price_asc':   return a.price - b.price
+      case 'name_asc':    return a.name.localeCompare(b.name)
+      default:            return b.rating - a.rating // rating_desc
+    }
+  })
+
+  // Pagination logic
+  const startIndex = (pageParam - 1) * limit
+  const endIndex = startIndex + limit
+  const data = filtered.slice(startIndex, endIndex)
+  
+  const nextPage = endIndex < filtered.length ? pageParam + 1 : null
+
+  return {
+    data,
+    nextPage,
+    total: filtered.length
+  }
 }
 
-export type SearchMetaResponse = {
-  nationalities: string[]
-  clubs: string[]
+// Helpers for the filters
+export const getNationalities = () => {
+  const nats = new Set(ALL_PLAYERS.map(p => p.nationality))
+  return Array.from(nats).sort()
 }
 
-export const getSearchMeta = (): Promise<SearchMetaResponse> => {
-  return apiJson<SearchMetaResponse>('/api/search/meta', { method: 'GET' })
-}
-
-export type SearchSuggestResponse = {
-  suggestions: { id: string; name: string }[]
-}
-
-export const getSearchSuggest = (q: string, limit = 8): Promise<SearchSuggestResponse> => {
-  const params = new URLSearchParams({ q: q.trim(), limit: String(limit) })
-  return apiJson<SearchSuggestResponse>(`/api/search/suggest?${params}`, { method: 'GET' })
+export const getClubs = () => {
+  const clubs = new Set(ALL_PLAYERS.map(p => p.club))
+  return Array.from(clubs).sort()
 }

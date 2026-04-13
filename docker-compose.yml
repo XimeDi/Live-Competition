@@ -1,54 +1,89 @@
+version: "3.9"
+
 services:
+  # ── PostgreSQL ────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fantasy
+      POSTGRES_PASSWORD: fantasy
+      POSTGRES_DB: fantasy_wc
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fantasy -d fantasy_wc"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  # ── Redis ─────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    command: ["redis-server", "--appendonly", "yes"]
+    restart: unless-stopped
     volumes:
       - redis_data:/data
-
-  meilisearch:
-    image: getmeili/meilisearch:v1.11
-    environment:
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-masterKey}
-      MEILI_NO_ANALYTICS: "true"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     ports:
-      - "7700:7700"
+      - "6379:6379"
+
+  # ── Meilisearch ───────────────────────────────────────────────────────────
+  meilisearch:
+    image: getmeili/meilisearch:v1.8
+    restart: unless-stopped
+    environment:
+      MEILI_NO_ANALYTICS: "true"
     volumes:
       - meili_data:/meili_data
+    ports:
+      - "7700:7700"
 
-  api:
+  # ── Backend (Fastify) ─────────────────────────────────────────────────────
+  server:
     build:
       context: ./server
       dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
+      DATABASE_URL: postgresql://fantasy:fantasy@db:5432/fantasy_wc
       REDIS_URL: redis://redis:6379
-      MEILISEARCH_HOST: http://meilisearch:7700
-      MEILISEARCH_API_KEY: ${MEILI_MASTER_KEY:-masterKey}
-      JWT_SECRET: ${JWT_SECRET:-change-me}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-30d}
       PORT: 3001
-      CORS_ORIGIN: http://localhost:3000
-      ADMIN_KEY: ${ADMIN_KEY:-change-me-secret-admin-key}
-    depends_on:
-      - redis
-      - meilisearch
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      ADMIN_SECRET: ${ADMIN_SECRET:-change-me-admin-secret}
     ports:
       - "3001:3001"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  web:
+  # ── Frontend (React + nginx) ───────────────────────────────────────────────
+  frontend:
     build:
       context: .
       dockerfile: Dockerfile
-    environment:
-      # Vite proxy will forward /auth and /api to api:3001
-      VITE_API_PROXY_TARGET: http://api:3001
+    restart: unless-stopped
     depends_on:
-      - api
+      server:
+        condition: service_healthy
     ports:
-      - "3000:3000"
+      - "3000:80"
 
 volumes:
+  postgres_data:
   redis_data:
   meili_data:
-

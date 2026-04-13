@@ -27,16 +27,24 @@ export async function parseJsonSafe(res: Response): Promise<unknown> {
 
 export async function apiJson<T>(
   path: string,
-  init?: RequestInit & { token?: string | null }
+  init?: RequestInit & { token?: string | null; headers?: Record<string, string> }
 ): Promise<T> {
-  const headers = new Headers(init?.headers)
-  if (!headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json")
+  const headers = new Headers()
+  headers.set("Content-Type", "application/json")
+
+  // Merge extra headers first
+  if (init?.headers) {
+    for (const [key, value] of Object.entries(init.headers)) {
+      headers.set(key, value)
+    }
   }
+
   if (init?.token) {
     headers.set("Authorization", `Bearer ${init.token}`)
   }
-  const res = await fetch(path, { ...init, headers })
+
+  const { token: _token, headers: _headers, ...rest } = init ?? {}
+  const res = await fetch(path, { ...rest, headers })
   const body = (await parseJsonSafe(res)) as ErrorBody | T | null
   if (!res.ok) {
     const errBody = body as ErrorBody | null

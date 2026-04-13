@@ -138,4 +138,16 @@
   ::-webkit-scrollbar-thumb:hover {
     background-color: oklch(var(--primary) / 0.5);
   }
+
+  /* Broadcast ticker scroll animation */
+  .ticker-content {
+    display: flex;
+    width: max-content;
+    animation: ticker-scroll 40s linear infinite;
+  }
+
+  @keyframes ticker-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-33.333%); }
+  }
 }

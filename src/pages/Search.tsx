@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
-import { Search as SearchIcon, Filter, Shield } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { useInfiniteQuery } from '@tanstack/react-query'
+import { Search as SearchIcon, SlidersHorizontal, X, ChevronDown } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -11,102 +11,71 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useDebounce } from '@/hooks/useDebounce'
-import { getPlayers, getSearchMeta, getSearchSuggest } from '@/services/api/players'
-import type { SearchFilters, Position } from '@/types'
+import { getPlayers, getNationalities, getClubs } from '@/services/api/players'
+import type { SearchFilters, Position, SortOption } from '@/types'
 import { useSquadStore } from '@/store/useSquadStore'
-import { useUiStore } from "@/store/useUiStore"
-import { translations } from "@/lib/translations"
-import { SigningCeremony } from "@/components/ui/SigningCeremony"
-import { ScoutReportModal } from "@/components/ui/ScoutReportModal"
+import { useUiStore } from '@/store/useUiStore'
+import { translations } from '@/lib/translations'
+import { SigningCeremony } from '@/components/ui/SigningCeremony'
+import { ScoutReportModal } from '@/components/ui/ScoutReportModal'
+import { useSquadSync } from '@/hooks/useSquadSync'
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.05
-    }
-  }
+const POSITION_COLORS: Record<string, string> = {
+  GK:  'bg-amber-500/10 text-amber-500 border-amber-500/30',
+  DEF: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+  MID: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+  FWD: 'bg-red-500/10 text-red-400 border-red-500/30',
 }
 
-const itemVariants = {
-  hidden: { y: 20, opacity: 0 },
-  visible: {
-    y: 0,
-    opacity: 1,
-    transition: {
-      type: 'spring' as const,
-      stiffness: 100,
-      damping: 15
-    }
-  }
+const SORT_LABELS_EN: Record<SortOption, string> = {
+  rating_desc: 'Highest rating',
+  rating_asc:  'Lowest rating',
+  price_desc:  'Highest price',
+  price_asc:   'Lowest price',
+  name_asc:    'Name A-Z',
+}
+
+const SORT_LABELS_ES: Record<SortOption, string> = {
+  rating_desc: 'Mayor media',
+  rating_asc:  'Menor media',
+  price_desc:  'Mayor precio',
+  price_asc:   'Menor precio',
+  name_asc:    'Nombre A-Z',
+}
+
+const DEFAULT_FILTERS: SearchFilters = {
+  query: '',
+  minRating: 0,
+  maxPrice: 300,
+  position: 'ALL',
+  nationality: '',
+  club: '',
+  sortBy: 'rating_desc',
 }
 
 export function Search() {
   const [searchParams] = useSearchParams()
   const slotIndexStr = searchParams.get('add')
   const initialPos = searchParams.get('pos') as Position | 'ALL' || 'ALL'
-  
+
   const { addPlayer, budget } = useSquadStore()
   const { language } = useUiStore()
+  const syncSquad = useSquadSync()
   const t = translations[language].search
   const errT = translations[language].errors
+  const sortLabels = language === 'es' ? SORT_LABELS_ES : SORT_LABELS_EN
 
   const [searchTerm, setSearchTerm] = useState('')
-  const debouncedSearch = useDebounce(searchTerm, 300)
-  const debouncedSuggestQ = useDebounce(searchTerm, 150)
-  const searchInputWrapRef = useRef<HTMLDivElement>(null)
-  const [suggestOpen, setSuggestOpen] = useState(false)
-
-  const [filters, setFilters] = useState<SearchFilters>({
-    query: '',
-    nationalities: [],
-    minRating: 0,
-    maxRating: 99,
-    minPrice: 0,
-    maxPrice: 300,
-    position: initialPos,
-    club: '',
-  })
+  const debouncedSearch = useDebounce(searchTerm, 250)
+  const [filters, setFilters] = useState<SearchFilters>({ ...DEFAULT_FILTERS, position: initialPos })
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const [signedPlayer, setSignedPlayer] = useState<any | null>(null)
   const [scoutPlayer, setScoutPlayer] = useState<any | null>(null)
 
   useEffect(() => {
-    const trimmed = debouncedSearch.trim()
-    setFilters((prev) => ({ ...prev, query: trimmed.length >= 2 ? trimmed : '' }))
+    setFilters(prev => ({ ...prev, query: debouncedSearch }))
   }, [debouncedSearch])
-
-  const { data: suggestData } = useQuery({
-    queryKey: ['search-suggest', debouncedSuggestQ],
-    queryFn: () => getSearchSuggest(debouncedSuggestQ.trim()),
-    enabled: debouncedSuggestQ.trim().length >= 2,
-    staleTime: 10_000,
-  })
-
-  const suggestions = suggestData?.suggestions ?? []
-
-  useEffect(() => {
-    const onDoc = (e: MouseEvent) => {
-      if (!searchInputWrapRef.current?.contains(e.target as Node)) {
-        setSuggestOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
-  }, [])
-
-  const toggleNationality = useCallback((n: string) => {
-    setFilters((prev) => {
-      const has = prev.nationalities.includes(n)
-      return {
-        ...prev,
-        nationalities: has
-          ? prev.nationalities.filter((x) => x !== n)
-          : [...prev.nationalities, n],
-      }
-    })
-  }, [])
 
   useEffect(() => {
     if (initialPos && initialPos !== filters.position) {
@@ -114,12 +83,25 @@ export function Search() {
     }
   }, [initialPos])
 
+  const activeFilterCount = [
+    filters.position !== 'ALL' && filters.position,
+    filters.nationality,
+    filters.club,
+    filters.minRating > 0,
+    filters.maxPrice < 300,
+  ].filter(Boolean).length
+
+  const resetFilters = useCallback(() => {
+    setSearchTerm('')
+    setFilters({ ...DEFAULT_FILTERS, position: 'ALL' })
+  }, [])
+
   const {
     data,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-    status
+    status,
   } = useInfiniteQuery({
     queryKey: ['players', filters],
     queryFn: ({ pageParam }) => getPlayers(filters, pageParam),
@@ -127,24 +109,18 @@ export function Search() {
     getNextPageParam: (lastPage) => lastPage.nextPage,
   })
 
-  const { data: searchMeta } = useQuery({
-    queryKey: ['search-meta'],
-    queryFn: getSearchMeta,
-    staleTime: 60 * 60 * 1000,
-  })
-
-  const nationalities = searchMeta?.nationalities ?? []
-  const clubs = searchMeta?.clubs ?? []
+  const nationalities = getNationalities()
+  const clubs = getClubs()
   const positions: Position[] = ['GK', 'DEF', 'MID', 'FWD']
 
   const handleSign = (player: any) => {
     if (slotIndexStr !== null) {
       const idx = parseInt(slotIndexStr)
       const error = addPlayer(idx, player)
-      
       if (!error) {
         setSignedPlayer(player)
         setScoutPlayer(null)
+        syncSquad()
       } else {
         toast.error(errT[error as keyof typeof errT] || error)
       }
@@ -154,407 +130,351 @@ export function Search() {
   }
 
   useEffect(() => {
-    let timeoutId: ReturnType<typeof setTimeout>
+    let id: ReturnType<typeof setTimeout>
     const handleScroll = () => {
-      if (
-        window.innerHeight + document.documentElement.scrollTop 
-        >= document.documentElement.offsetHeight - 200
-      ) {
+      if (window.innerHeight + document.documentElement.scrollTop >= document.documentElement.offsetHeight - 300) {
         if (hasNextPage && !isFetchingNextPage) {
-          clearTimeout(timeoutId)
-          timeoutId = setTimeout(() => {
-            fetchNextPage()
-          }, 100)
+          clearTimeout(id)
+          id = setTimeout(() => fetchNextPage(), 80)
         }
       }
     }
     window.addEventListener('scroll', handleScroll)
-    return () => {
-      window.removeEventListener('scroll', handleScroll)
-      clearTimeout(timeoutId)
-    }
+    return () => { window.removeEventListener('scroll', handleScroll); clearTimeout(id) }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
-  const players = data?.pages.flatMap((page) => page.data) || []
-  const totalCount = data?.pages[0]?.total ?? 0
-  const prospectsLabel =
-    status === 'pending'
-      ? 'ANALYZING MARKET...'
-      : t.prospectsCount
-          .replace('{{shown}}', String(players.length))
-          .replace('{{total}}', String(totalCount))
+  const players = data?.pages.flatMap(page => page.data) || []
+  const total = data?.pages[0]?.total ?? 0
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Immersive Stadium Background - Realistic and Subtle */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1547619292-8816ee7cdd50?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-[0.07] grayscale" />
-        <div className="absolute inset-0 bg-gradient-to-b from-background via-background/95 to-background" />
-        <div className="absolute top-0 inset-x-0 h-64 bg-gradient-to-b from-primary/5 to-transparent" />
-      </div>
+    <div className="min-h-screen bg-background">
+      <div className="h-1 w-full bg-gradient-to-r from-green-600 via-primary to-green-600" />
 
-      <div className="container relative z-10 py-10">
-        <SigningCeremony player={signedPlayer} onComplete={() => setSignedPlayer(null)} />
-        <ScoutReportModal 
-          player={scoutPlayer} 
-          isOpen={!!scoutPlayer} 
-          onClose={() => setScoutPlayer(null)} 
-          onSign={handleSign}
-          canSign={budget >= (scoutPlayer?.price || 0)}
-        />
+      <SigningCeremony player={signedPlayer} onComplete={() => setSignedPlayer(null)} />
+      <ScoutReportModal
+        player={scoutPlayer}
+        isOpen={!!scoutPlayer}
+        onClose={() => setScoutPlayer(null)}
+        onSign={handleSign}
+        canSign={budget >= (scoutPlayer?.price || 0)}
+      />
 
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b-[6px] border-primary/10 mb-12 relative">
-          <div className="absolute -bottom-[6px] left-0 w-24 h-[6px] bg-primary shadow-[0_0_20px_oklch(var(--primary))]" />
+      <div className="container py-8">
+        {/* ── Page header ── */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
           <div>
-            <div className="flex items-center gap-3 text-primary mb-3">
-              <div className="h-1 w-6 bg-primary" />
-              <span className="text-[10px] font-oswald font-black uppercase tracking-[0.5em]">{t.title}</span>
-            </div>
-            <h1 className="text-7xl md:text-9xl font-oswald font-black uppercase tracking-tighter leading-[0.75] italic">
-              SCOUTING <span className="text-primary italic">HUB</span>
-            </h1>
+            <h1 className="text-2xl font-bold text-foreground">{t.title}</h1>
+            <p className="text-sm text-foreground/50 mt-0.5">
+              {status === 'success' ? `${total.toLocaleString()} ${t.prospects}` : '…'}
+            </p>
           </div>
-          <div className="bg-foreground/5 backdrop-blur-3xl px-8 py-5 rounded-3xl border border-white/10 flex flex-col items-end shadow-2xl relative overflow-hidden group">
-             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-             <p className="text-[10px] font-oswald font-black text-primary uppercase tracking-widest relative z-10">{t.budget}</p>
-             <p className="text-5xl font-oswald font-black text-foreground italic relative z-10">${budget.toFixed(1)}M</p>
+          <div className="rounded-xl border border-border/60 bg-card/60 px-4 py-2 text-sm self-start sm:self-auto">
+            <span className="text-foreground/50">{t.budget}: </span>
+            <span className="font-bold text-primary">${budget.toFixed(1)}M</span>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
-          {/* Filters Sidebar */}
-          <div className="space-y-6 lg:sticky lg:top-24 h-fit">
-            <div className="broadcast-glass rounded-[2rem] overflow-hidden">
-              <div className="bg-primary px-8 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                   <Filter className="h-4 w-4 text-black" />
-                   <span className="font-oswald font-black uppercase tracking-widest text-black text-xs">{t.filters}</span>
-                </div>
-                <div className="h-1.5 w-1.5 rounded-full bg-black/40" />
-              </div>
-              
-              <div className="p-8 space-y-8">
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 font-barlow italic">Search Metadata</label>
-                  <div ref={searchInputWrapRef} className="relative group">
-                    <SearchIcon className="absolute left-4 top-4 h-4 w-4 text-foreground/20 group-focus-within:text-primary transition-colors z-10 pointer-events-none" />
-                    <Input 
-                      placeholder={t.searchPlaceholder}
-                      className="pl-12 h-14 bg-black/20 border-white/5 font-barlow italic text-lg rounded-2xl focus:ring-primary focus:border-primary transition-all placeholder:text-foreground/10"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      onFocus={() => setSuggestOpen(true)}
-                      autoComplete="off"
-                    />
-                    {searchTerm.trim().length === 1 && (
-                      <p className="text-[10px] text-foreground/40 font-barlow mt-2 px-1">{t.typeTwoMore}</p>
-                    )}
-                    {suggestOpen && suggestions.length > 0 && searchTerm.trim().length >= 2 && (
-                      <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-2xl border border-white/10 bg-background/95 backdrop-blur-xl shadow-2xl overflow-hidden">
-                        <p className="text-[9px] font-oswald font-black uppercase tracking-widest text-primary px-4 py-2 border-b border-white/5">
-                          {t.suggestions}
-                        </p>
-                        <ul className="max-h-56 overflow-y-auto py-1">
-                          {suggestions.map((s) => (
-                            <li key={s.id}>
-                              <button
-                                type="button"
-                                className="w-full text-left px-4 py-2.5 text-sm font-barlow hover:bg-primary/10 transition-colors"
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={() => {
-                                  setSearchTerm(s.name)
-                                  setSuggestOpen(false)
-                                }}
-                              >
-                                {s.name}
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+        {/* ── Search bar + sort + filter toggle ── */}
+        <div className="flex gap-3 mb-6 flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/30" />
+            <Input
+              placeholder={t.searchPlaceholder}
+              className="pl-10 h-11 bg-card/60 border-border/60 rounded-xl"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/30 hover:text-foreground transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Sort */}
+          <Select
+            value={filters.sortBy}
+            onValueChange={val => setFilters(prev => ({ ...prev, sortBy: val as SortOption }))}
+          >
+            <SelectTrigger className="h-11 w-auto min-w-[160px] bg-card/60 border-border/60 rounded-xl text-sm gap-2">
+              <ChevronDown className="h-4 w-4 text-foreground/40 shrink-0" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl">
+              {(Object.entries(sortLabels) as [SortOption, string][]).map(([val, label]) => (
+                <SelectItem key={val} value={val} className="text-sm">{label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Filter toggle */}
+          <button
+            onClick={() => setSidebarOpen(o => !o)}
+            className={`h-11 px-4 rounded-xl border text-sm font-medium flex items-center gap-2 transition-all ${
+              sidebarOpen || activeFilterCount > 0
+                ? 'border-primary/40 bg-primary/10 text-primary'
+                : 'border-border/60 bg-card/60 text-foreground/60 hover:text-foreground hover:border-border'
+            }`}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            {t.filters}
+            {activeFilterCount > 0 && (
+              <span className="h-5 w-5 rounded-full bg-primary text-black text-[10px] font-bold flex items-center justify-center">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+
+          {activeFilterCount > 0 && (
+            <button
+              onClick={resetFilters}
+              className="h-11 px-4 rounded-xl border border-border/60 text-sm text-foreground/50 hover:text-destructive hover:border-destructive/30 transition-all flex items-center gap-2"
+            >
+              <X className="h-3.5 w-3.5" /> {t.clearFilters}
+            </button>
+          )}
+        </div>
+
+        {/* ── Filter panel ── */}
+        <AnimatePresence>
+          {sidebarOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden mb-6"
+            >
+              <div className="rounded-2xl border border-border/60 bg-card/60 p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* Position */}
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-foreground/50 uppercase tracking-widest">{t.position}</label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setFilters(prev => ({ ...prev, position: 'ALL' }))}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                        filters.position === 'ALL' || !filters.position
+                          ? 'bg-primary/10 border-primary/30 text-primary'
+                          : 'border-border/60 text-foreground/50 hover:border-border'
+                      }`}
+                    >
+                      {t.allPositions}
+                    </button>
+                    {positions.map(pos => (
+                      <button
+                        key={pos}
+                        onClick={() => setFilters(prev => ({ ...prev, position: pos }))}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                          filters.position === pos
+                            ? `${POSITION_COLORS[pos]} border-current`
+                            : 'border-border/60 text-foreground/50 hover:border-border'
+                        }`}
+                      >
+                        {pos}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 font-barlow italic">Position Tier</label>
-                  <Select 
-                    value={filters.position} 
-                    onValueChange={(val: any) => setFilters(prev => ({...prev, position: val}))}
+                {/* Nationality */}
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-foreground/50 uppercase tracking-widest">{t.nationality}</label>
+                  <Select
+                    value={filters.nationality || 'ALL'}
+                    onValueChange={val => setFilters(prev => ({ ...prev, nationality: val === 'ALL' ? undefined : (val ?? undefined) }))}
                   >
-                    <SelectTrigger className="bg-black/20 border-white/5 h-14 font-oswald uppercase font-black italic rounded-2xl text-foreground/80">
-                      <SelectValue placeholder="All Positions" />
+                    <SelectTrigger className="h-10 bg-background/60 border-border/60 rounded-xl text-sm">
+                      <SelectValue placeholder={t.allNations} />
                     </SelectTrigger>
-                    <SelectContent className="broadcast-glass border-white/10 rounded-2xl">
-                      <SelectItem value="ALL">{language === 'es' ? 'TODAS' : 'ALL'}</SelectItem>
-                      {positions.map(pos => (
-                         <SelectItem key={pos} value={pos} className="font-oswald font-black italic">{pos}</SelectItem>
+                    <SelectContent className="rounded-xl max-h-60">
+                      <SelectItem value="ALL">{t.allNations}</SelectItem>
+                      {nationalities.map(n => (
+                        <SelectItem key={n} value={n} className="text-sm">{n}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 font-barlow italic">
-                      {t.nationalities}
-                    </label>
-                    {filters.nationalities.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setFilters((prev) => ({ ...prev, nationalities: [] }))}
-                        className="text-[9px] font-oswald font-black uppercase tracking-widest text-primary hover:underline"
-                      >
-                        {t.clearNations}
-                      </button>
-                    )}
-                  </div>
-                  <p className="text-[9px] text-foreground/30 font-barlow -mt-1">{t.nationalitiesHint}</p>
-                  <div className="max-h-48 overflow-y-auto space-y-2 rounded-2xl border border-white/10 bg-black/20 p-3">
-                    {nationalities.map((n) => (
-                      <label
-                        key={n}
-                        className="flex items-center gap-3 text-sm font-barlow cursor-pointer text-foreground/80 hover:text-foreground"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={filters.nationalities.includes(n)}
-                          onChange={() => toggleNationality(n)}
-                          className="rounded border-white/20 bg-black/40 text-primary focus:ring-primary"
-                        />
-                        <span>{n}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 font-barlow italic">
-                    {t.club}
-                  </label>
+                {/* Club */}
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-foreground/50 uppercase tracking-widest">{t.club}</label>
                   <Select
                     value={filters.club || 'ALL'}
-                    onValueChange={(val) =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        club: !val || val === 'ALL' ? '' : val,
-                      }))
-                    }
+                    onValueChange={val => setFilters(prev => ({ ...prev, club: val === 'ALL' ? undefined : (val ?? undefined) }))}
                   >
-                    <SelectTrigger className="bg-black/20 border-white/5 h-14 font-oswald uppercase font-black italic rounded-2xl text-foreground/80">
+                    <SelectTrigger className="h-10 bg-background/60 border-border/60 rounded-xl text-sm">
                       <SelectValue placeholder={t.allClubs} />
                     </SelectTrigger>
-                    <SelectContent className="broadcast-glass border-white/10 rounded-2xl max-h-[min(280px,50vh)] overflow-y-auto">
+                    <SelectContent className="rounded-xl max-h-60">
                       <SelectItem value="ALL">{t.allClubs}</SelectItem>
-                      {clubs.map((c) => (
-                        <SelectItem key={c} value={c} className="font-oswald font-black italic text-xs">
-                          {c}
-                        </SelectItem>
+                      {clubs.map(c => (
+                        <SelectItem key={c} value={c} className="text-sm">{c}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
-                <div className="space-y-5 pt-4">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 font-barlow italic">
-                      {t.minOvr}
-                    </label>
-                    <span className="text-4xl font-oswald font-black text-primary italic">{filters.minRating === 0 ? t.any : filters.minRating}</span>
+                {/* Rating + Price */}
+                <div className="space-y-5">
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-semibold text-foreground/50 uppercase tracking-widest">{t.minOvr}</label>
+                      <span className="text-xs font-bold text-primary">
+                        {filters.minRating === 0 ? t.any : filters.minRating}
+                      </span>
+                    </div>
+                    <Slider
+                      value={[filters.minRating]}
+                      max={99} min={0} step={1}
+                      onValueChange={(vals) => setFilters(prev => ({ ...prev, minRating: (vals as number[])[0] }))}
+                    />
                   </div>
-                  <Slider 
-                    value={[filters.minRating]} 
-                    max={99} 
-                    step={1}
-                    onValueChange={(vals) => setFilters(prev => ({...prev, minRating: (vals as number[])[0]}))}
-                    className="py-4"
-                  />
-                </div>
-
-                <div className="space-y-5 pt-4">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 font-barlow italic">
-                      {t.maxOvr}
-                    </label>
-                    <span className="text-4xl font-oswald font-black text-primary italic">
-                      {filters.maxRating >= 99 ? t.any : filters.maxRating}
-                    </span>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-semibold text-foreground/50 uppercase tracking-widest">{t.maxPrice}</label>
+                      <span className="text-xs font-bold text-primary">${filters.maxPrice}M</span>
+                    </div>
+                    <Slider
+                      value={[filters.maxPrice]}
+                      max={300} min={0} step={5}
+                      onValueChange={(vals) => setFilters(prev => ({ ...prev, maxPrice: (vals as number[])[0] }))}
+                    />
                   </div>
-                  <Slider
-                    value={[filters.maxRating]}
-                    max={99}
-                    step={1}
-                    onValueChange={(vals) =>
-                      setFilters((prev) => ({ ...prev, maxRating: (vals as number[])[0] }))
-                    }
-                    className="py-4"
-                  />
-                </div>
-
-                <div className="space-y-5 pt-4">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 font-barlow italic">
-                      {t.minPrice}
-                    </label>
-                    <span className="text-4xl font-oswald font-black text-primary italic">
-                      {filters.minPrice === 0 ? t.any : `$${filters.minPrice}M`}
-                    </span>
-                  </div>
-                  <Slider
-                    value={[filters.minPrice]}
-                    max={300}
-                    step={5}
-                    onValueChange={(vals) =>
-                      setFilters((prev) => ({ ...prev, minPrice: (vals as number[])[0] }))
-                    }
-                    className="py-4"
-                  />
-                </div>
-
-                <div className="space-y-5 pt-4">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 font-barlow italic">
-                      {t.maxPrice}
-                    </label>
-                    <span className="text-4xl font-oswald font-black text-primary italic">${filters.maxPrice}M</span>
-                  </div>
-                  <Slider 
-                    value={[filters.maxPrice]} 
-                    max={300} 
-                    step={5}
-                    onValueChange={(vals) => setFilters(prev => ({...prev, maxPrice: (vals as number[])[0]}))}
-                    className="py-4"
-                  />
                 </div>
               </div>
-            </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Results ── */}
+        {status === 'pending' ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {Array.from({ length: 10 }).map((_, i) => (
+              <Skeleton key={i} className="h-64 w-full rounded-2xl" />
+            ))}
           </div>
+        ) : status === 'error' ? (
+          <div className="text-center py-24">
+            <p className="text-foreground/40 font-medium">Error.</p>
+          </div>
+        ) : players.length === 0 ? (
+          <div className="text-center py-24 space-y-3">
+            <SearchIcon className="h-10 w-10 mx-auto text-foreground/20" />
+            <p className="font-semibold text-foreground/40">{t.noResults}</p>
+            <p className="text-sm text-foreground/30">{t.noResultsSub}</p>
+            <Button onClick={resetFilters} variant="outline" className="mt-4">
+              {t.clearFilters}
+            </Button>
+          </div>
+        ) : (
+          <motion.div layout className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <AnimatePresence mode="popLayout">
+              {players.map((player, i) => (
+                <motion.div
+                  key={player.id}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ delay: i < 10 ? i * 0.03 : 0, duration: 0.2 }}
+                  onClick={() => setScoutPlayer(player)}
+                  className="group cursor-pointer"
+                >
+                  <div className={`relative rounded-2xl border overflow-hidden bg-card/60 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10 transition-all duration-200 ${
+                    player.rating >= 90
+                      ? 'border-secondary/40 bg-gradient-to-b from-secondary/5 to-transparent'
+                      : 'border-border/60'
+                  }`}>
+                    {/* Rating badge */}
+                    <div className="absolute top-2 left-2 z-10">
+                      <div className={`flex flex-col items-center leading-none px-2 py-1 rounded-lg ${
+                        player.rating >= 90 ? 'bg-secondary/20 border border-secondary/40' : 'bg-black/30 border border-white/10'
+                      }`}>
+                        <span className={`text-xl font-black ${player.rating >= 90 ? 'text-secondary' : 'text-white'}`}>
+                          {player.rating}
+                        </span>
+                        <span className={`text-[9px] font-bold uppercase tracking-wider ${
+                          player.rating >= 90 ? 'text-secondary/80' : 'text-white/60'
+                        }`}>
+                          {player.position}
+                        </span>
+                      </div>
+                    </div>
 
-          {/* Results Grid */}
-          <div className="lg:col-span-3 space-y-8">
-            <div className="flex items-center justify-between px-6 py-4 bg-foreground/5 rounded-2xl border border-white/5 backdrop-blur-xl">
-              <div className="flex items-center gap-4">
-                 <div className="w-12 h-1 bg-primary shadow-[0_0_10px_oklch(var(--primary))]" />
-                 <span className="text-xs font-oswald font-black uppercase tracking-[0.5em] text-primary italic">
-                  {prospectsLabel}
-                 </span>
-              </div>
-            </div>
+                    {/* Nation */}
+                    <div className="absolute top-2 right-2 z-10">
+                      <div className="h-7 w-7 rounded-full bg-black/30 backdrop-blur-sm border border-white/10 flex items-center justify-center">
+                        <span className="text-[9px] font-bold text-white/70">
+                          {player.nationality.substring(0, 3).toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
 
-            {status === 'pending' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-                 {[1,2,3,4,5,6].map(i => (
-                   <Skeleton key={i} className="h-96 w-full rounded-[2rem]" />
-                 ))}
-              </div>
-            ) : status === 'error' ? (
-              <div className="text-center p-12 border-4 border-destructive/20 rounded-[2.5rem] bg-destructive/5">
-                  <h3 className="text-4xl font-oswald font-black text-destructive italic uppercase">Error</h3>
-              </div>
-            ) : (
-              <AnimatePresence mode="popLayout">
-                {players.length === 0 ? (
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="text-center p-20 border-4 border-dashed border-white/5 bg-card/10 rounded-[2.5rem] backdrop-blur-xl"
-                  >
-                    <Shield className="h-20 w-20 mx-auto text-muted-foreground/20 mb-6" />
-                    <h3 className="text-4xl font-oswald font-black uppercase italic tracking-tighter">{t.noResults}</h3>
-                  </motion.div>
-                ) : (
-                  <motion.div 
-                    variants={containerVariants}
-                    initial="hidden"
-                    animate="visible"
-                    className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-10"
-                  >
-                    {players.map(player => (
-                      <motion.div 
-                        key={player.id} 
-                        variants={itemVariants} 
-                        className="group"
-                        onClick={() => setScoutPlayer(player)}
+                    {/* Player image */}
+                    <div className="relative h-36 overflow-hidden bg-gradient-to-b from-muted/30 to-transparent">
+                      <img
+                        src={player.photo}
+                        alt={player.name}
+                        loading="lazy"
+                        className="absolute bottom-0 left-1/2 -translate-x-1/2 h-32 object-contain object-bottom group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
+
+                    {/* Info */}
+                    <div className="p-3 pt-2 border-t border-border/30">
+                      <p className="font-bold text-sm text-foreground leading-tight truncate group-hover:text-primary transition-colors">
+                        {player.name}
+                      </p>
+                      <p className="text-[10px] text-foreground/40 truncate mt-0.5">{player.club}</p>
+
+                      <div className="flex items-center justify-between mt-2.5 gap-2">
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-md border ${POSITION_COLORS[player.position]}`}>
+                          {player.position}
+                        </span>
+                        <span className="text-sm font-black text-foreground">${player.price}M</span>
+                      </div>
+
+                      <button
+                        onClick={e => {
+                          e.stopPropagation()
+                          if (budget >= player.price) handleSign(player)
+                          else toast.error(errT.insubBudget)
+                        }}
+                        className={`w-full mt-2 h-8 rounded-lg text-xs font-bold transition-all ${
+                          budget >= player.price
+                            ? 'bg-primary/10 text-primary border border-primary/30 hover:bg-primary hover:text-black'
+                            : 'bg-foreground/5 text-foreground/20 border border-border/30 cursor-not-allowed'
+                        }`}
                       >
-                        <div className={`panini-foil relative h-[32rem] rounded-[2.5rem] border-[4px] overflow-hidden shadow-2xl transition-all duration-700 hover:-translate-y-4 cursor-pointer perspective-1000 ${
-                           player.rating >= 90 
-                            ? 'bg-gradient-to-b from-secondary/40 via-card/60 to-background border-secondary/40 shadow-secondary/10' 
-                            : 'bg-gradient-to-b from-card/80 via-card/40 to-background border-white/10 hover:border-primary/50'
-                         }`}>
-                           {/* Stadium Ambient VFX */}
-                           <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1547619292-8816ee7cdd50?auto=format&fit=crop&q=80')] bg-cover bg-center mix-blend-soft-light opacity-20 transition-opacity duration-1000 group-hover:opacity-40" />
-                           <div className="absolute inset-0 bg-gradient-to-tr from-black via-transparent to-white/5" />
+                        {budget >= player.price ? t.sign : t.noBudget}
+                      </button>
+                    </div>
 
-                           {/* Rating & Position - Floating Broadcast Style */}
-                           <div className="absolute top-10 left-10 z-20">
-                              <div className="flex flex-col items-center">
-                                <span className="text-7xl font-oswald font-black text-foreground italic tracking-tighter leading-none group-hover:text-primary transition-colors duration-500 drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]">{player.rating}</span>
-                                <div className="h-1.5 w-12 bg-primary mt-2 shadow-[0_0_15px_oklch(var(--primary))]" />
-                                <span className="text-xs font-barlow font-black text-primary uppercase tracking-[0.3em] mt-2 italic">{player.position}</span>
-                              </div>
-                           </div>
+                    {player.rating >= 90 && (
+                      <div className="absolute inset-0 pointer-events-none rounded-2xl ring-1 ring-secondary/30" />
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
+        )}
 
-                           {/* Nation Badge - Premium Glass Circle */}
-                           <div className="absolute top-10 right-10 z-20">
-                              <div className="w-12 h-12 rounded-full border border-white/20 bg-foreground/5 backdrop-blur-3xl flex items-center justify-center text-[11px] font-oswald font-black text-foreground/80 shadow-2xl">
-                                {player.nationality.substring(0,3).toUpperCase()}
-                              </div>
-                           </div>
-
-                           {/* Player Image - Cinematic High-Contrast */}
-                           <div className="absolute inset-x-0 bottom-0 flex items-end justify-center h-[90%] pointer-events-none">
-                              <motion.img 
-                                src={player.photo} 
-                                alt={player.name} 
-                                className="h-full object-contain object-bottom drop-shadow-[0_30px_50px_rgba(0,0,0,0.9)] group-hover:scale-110 transition-transform duration-1000 z-10"
-                                whileHover={{ y: -10 }}
-                              />
-                              <div className="absolute bottom-0 inset-x-0 h-1/2 bg-gradient-to-t from-background via-background/80 to-transparent z-20" />
-                           </div>
-
-                           {/* Name & Call to Action - Broadcast Lower Third Style */}
-                           <div className="absolute bottom-0 inset-x-0 p-10 z-30">
-                              <div className="relative overflow-hidden p-6 rounded-2xl bg-foreground/5 backdrop-blur-3xl border border-white/10 group-hover:border-primary/30 transition-colors duration-500">
-                                <div className="absolute top-0 left-0 w-1 h-full bg-primary/40 group-hover:bg-primary transition-colors duration-500" />
-                                <h3 className="text-4xl font-oswald font-black italic text-foreground uppercase tracking-tighter leading-none mb-3 group-hover:text-primary transition-colors">
-                                  {player.name}
-                                </h3>
-                                <div className="flex items-center justify-between gap-4">
-                                  <div className="flex flex-col">
-                                    <span className="text-[10px] font-oswald font-black text-foreground/40 uppercase tracking-widest italic">Market Value</span>
-                                    <span className="text-2xl font-oswald font-black text-foreground italic tracking-tighter">${player.price}M</span>
-                                  </div>
-                                  <Button 
-                                    variant="secondary" 
-                                    size="lg"
-                                    className={`h-12 px-8 font-oswald font-black italic uppercase tracking-[0.2em] rounded-xl transition-all shadow-2xl ${
-                                      budget >= player.price ? 'bg-primary text-black hover:scale-110' : 'bg-foreground/5 text-foreground/10 cursor-not-allowed'
-                                    }`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (budget >= player.price) handleSign(player);
-                                    }}
-                                  >
-                                    {budget >= player.price ? 'EXECUTE' : 'LOCKED'}
-                                  </Button>
-                                </div>
-                              </div>
-                           </div>
-                         </div>
-                      </motion.div>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            )}
-
-            {isFetchingNextPage && (
-              <div className="py-20 text-center">
-                 <div className="inline-block h-10 w-10 animate-spin rounded-full border-4 border-primary border-r-transparent"></div>
-              </div>
-            )}
+        {isFetchingNextPage && (
+          <div className="py-10 flex justify-center">
+            <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
           </div>
-        </div>
+        )}
+
+        {!hasNextPage && players.length > 0 && (
+          <div className="py-8 text-center">
+            <p className="text-xs text-foreground/30">
+              {t.noMoreResults.replace('{n}', players.length.toString())}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )

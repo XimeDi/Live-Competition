@@ -1,26 +1,36 @@
-import type { Player } from "@/types"
 import { apiJson } from "./client"
 
-export type StoredSquad = {
-  formation: string
-  players: (Player | null)[]
-  updatedAt: string
+export interface SquadPlayerSlot {
+  id: string
+  name: string
+  nationality: string
+  position: string
 }
 
-export type SquadResponse = { squad: StoredSquad | null }
-
-export function fetchSquad(token: string): Promise<SquadResponse> {
-  return apiJson<SquadResponse>("/api/squad", { method: "GET", token })
+export interface RemoteSquad {
+  formation: string
+  budget: number
+  players: (SquadPlayerSlot | null)[]
 }
 
 export function saveSquad(
   token: string,
-  formation: string,
-  players: (Player | null)[]
-): Promise<{ squad: StoredSquad }> {
-  return apiJson("/api/squad", {
-    method: "PUT",
+  data: {
+    formation: string
+    budget: number
+    players: (SquadPlayerSlot | null)[]
+  }
+): Promise<{ ok: boolean }> {
+  return apiJson<{ ok: boolean }>("/api/squad", {
+    method: "POST",
     token,
-    body: JSON.stringify({ formation, players }),
+    body: JSON.stringify(data),
+  })
+}
+
+export function fetchSquad(token: string): Promise<{ squad: RemoteSquad | null }> {
+  return apiJson<{ squad: RemoteSquad | null }>("/api/squad", {
+    method: "GET",
+    token,
   })
 }

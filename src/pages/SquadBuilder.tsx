@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import { useEffect, useRef } from 'react'
 import { Plus, Trash2, Settings, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CardContent } from '@/components/ui/card'
@@ -8,25 +7,17 @@ import type { Formation } from '@/store/useSquadStore'
 import { Button } from '@/components/ui/button'
 import { useUiStore } from "@/store/useUiStore"
 import { translations } from "@/lib/translations"
-import { useAuthStore } from "@/store/useAuthStore"
+import { useSquadSync } from "@/hooks/useSquadSync"
 
 const FORMATIONS: Formation[] = ["4-3-3", "4-4-2", "3-5-2"]
 
 export function SquadBuilder() {
-  const { formation, players, budget, setFormation, removePlayer, getIsComplete, syncToBackend } = useSquadStore()
+  const { formation, players, budget, setFormation, removePlayer, getIsComplete } = useSquadStore()
   const { language } = useUiStore()
   const t = translations[language].squad
-  const { token, user } = useAuthStore()
+  const syncSquad = useSquadSync()
 
   const isComplete = getIsComplete()
-
-  // Auto-save squad to backend whenever it changes (F3.7).
-  const isFirstRender = useRef(true)
-  useEffect(() => {
-    if (isFirstRender.current) { isFirstRender.current = false; return }
-    if (!token) return
-    void syncToBackend(token)
-  }, [players, formation, token, syncToBackend])
 
   return (
     <div className="space-y-8 pb-20 animate-in fade-in duration-700">
@@ -36,44 +27,22 @@ export function SquadBuilder() {
         className="flex flex-col xl:flex-row xl:items-end justify-between gap-6"
       >
         <div>
-          <div className="flex items-center gap-2 mb-2 text-primary">
-            <Settings className="h-4 w-4 animate-spin-slow" />
-            <span className="text-[10px] font-bold font-barlow uppercase tracking-[0.2em]">{t.title}</span>
-          </div>
-          <h1 className="text-5xl md:text-7xl font-oswald font-black tracking-tighter uppercase italic leading-[0.8] mb-2">
-            SQUAD <span className="text-primary italic">BUILDER</span>
-          </h1>
-          <p className="font-barlow text-lg text-muted-foreground italic">{t.subtitle}</p>
+          <h1 className="text-2xl font-bold text-foreground mb-1">Pizarra táctica</h1>
+          <p className="text-sm text-foreground/50">{t.subtitle}</p>
         </div>
 
         <div className="flex items-center gap-4 bg-card/40 backdrop-blur-xl p-1 rounded-2xl border border-white/5 shadow-2xl overflow-hidden stadium-glow">
-          <div className="px-6 py-3 bg-background/40 rounded-xl border border-white/5">
-            <p className="text-[10px] uppercase tracking-widest font-bold font-barlow text-muted-foreground mb-1">{t.budget}</p>
-            <div className="flex items-baseline gap-1">
-              <p className={`text-4xl font-oswald font-bold ${budget < 10 ? 'text-destructive animate-pulse' : 'text-primary'}`}>
-                ${budget.toFixed(1)}
-              </p>
-              <span className="text-sm font-oswald font-bold text-muted-foreground">M</span>
-            </div>
+          <div className="px-5 py-3 bg-background/60 rounded-xl border border-border/50">
+            <p className="text-[10px] uppercase tracking-widest font-semibold text-foreground/40 mb-0.5">{t.budget}</p>
+            <p className={`text-2xl font-black ${budget < 10 ? 'text-destructive animate-pulse' : 'text-primary'}`}>
+              ${budget.toFixed(1)}M
+            </p>
           </div>
-          <div className="px-6 py-3 bg-background/40 rounded-xl border border-white/5 min-w-[140px]">
-            <p className="text-[10px] uppercase tracking-widest font-bold font-barlow text-muted-foreground mb-1">Points</p>
-            <div className="flex items-baseline gap-1">
-              <p className="text-4xl font-oswald font-bold text-secondary">
-                {user?.points ?? 0}
-              </p>
-              <span className="text-sm font-oswald font-bold text-muted-foreground">PTS</span>
-            </div>
-          </div>
-          <div className="px-6 py-3 bg-background/40 rounded-xl border border-white/5 min-w-[140px]">
-            <p className="text-[10px] uppercase tracking-widest font-bold font-barlow text-muted-foreground mb-1">{t.slots}</p>
-            <div className="flex items-baseline gap-1">
-              <p className="text-4xl font-oswald font-bold text-foreground">
-                {players.filter(p => !!p).length}
-                <span className="text-foreground/20">/</span>
-                11
-              </p>
-            </div>
+          <div className="px-5 py-3 bg-background/60 rounded-xl border border-border/50">
+            <p className="text-[10px] uppercase tracking-widest font-semibold text-foreground/40 mb-0.5">{t.slots}</p>
+            <p className="text-2xl font-black text-foreground">
+              {players.filter(p => !!p).length}<span className="text-foreground/30 font-normal text-lg">/11</span>
+            </p>
           </div>
         </div>
       </motion.div>
@@ -86,13 +55,13 @@ export function SquadBuilder() {
           transition={{ delay: 0.1 }}
           className="space-y-6 lg:sticky lg:top-24"
         >
-          <div className="fifa-card bg-card/60 stadium-glow">
-            <div className="bg-primary/20 px-4 py-3 border-b border-white/10 flex items-center justify-between">
+          <div className="rounded-2xl border border-border/60 bg-card/60 overflow-hidden">
+            <div className="px-4 py-3 border-b border-border/40 bg-foreground/[0.02] flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Settings className="h-4 w-4 text-primary" />
-                <span className="text-xs font-oswald font-bold uppercase tracking-widest">{t.formation}</span>
+                <span className="text-xs font-semibold text-foreground/70">{t.formation}</span>
               </div>
-              <div className="text-[10px] font-bold font-barlow text-primary px-2 py-0.5 rounded bg-primary/20">{formation}</div>
+              <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">{formation}</span>
             </div>
             <CardContent className="p-6 space-y-6">
               <div className="space-y-3">
@@ -200,8 +169,8 @@ export function SquadBuilder() {
                         <div className="w-full h-full rounded-full overflow-hidden border-[3px] border-white relative">
                           <img src={player.photo} alt={player.name} className="w-full h-full object-contain object-bottom pt-2" />
                           <div className="absolute inset-0 bg-black/80 opacity-0 group-hover/player:opacity-100 flex items-center justify-center transition-all duration-300 backdrop-blur-sm">
-                             <button 
-                              onClick={(e) => { e.preventDefault(); removePlayer(index); }}
+                             <button
+                              onClick={(e) => { e.preventDefault(); removePlayer(index); syncSquad() }}
                               className="bg-destructive text-foreground rounded-full p-3 hover:bg-rose-500 hover:scale-125 transition-all shadow-2xl"
                             >
                               <Trash2 className="h-5 w-5" />
@@ -245,30 +214,15 @@ export function SquadBuilder() {
               )
             })}
 
-            {/* Tactical Broadcast Overlay - Premium Scoreboard Style */}
-            <div className="absolute top-8 left-10 hidden md:block z-20">
-              <motion.div 
-                initial={{ x: -100, opacity: 0 }}
+            {/* Formation label overlay */}
+            <div className="absolute top-4 left-4 hidden md:block z-20">
+              <motion.div
+                initial={{ x: -40, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
-                className="bg-card/40 backdrop-blur-3xl border-l-[6px] border-primary px-6 py-4 rounded-r-2xl shadow-2xl relative overflow-hidden group"
+                className="bg-black/60 backdrop-blur-md border-l-4 border-primary px-4 py-2 rounded-r-xl shadow-xl"
               >
-                <div className="relative z-10">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_15px_oklch(var(--primary))]" />
-                    <p className="text-[9px] font-black font-barlow text-primary uppercase tracking-[0.5em] italic">STADIUM BROADCAST // LIVE</p>
-                  </div>
-                  <h3 className="text-3xl font-oswald font-black uppercase tracking-tighter text-foreground italic group-hover:scale-105 transition-transform origin-left">
-                    {formation} <span className="text-foreground/40">TACTICAL</span>
-                  </h3>
-                  <div className="flex items-center gap-6 mt-3">
-                     <div className="flex flex-col">
-                        <span className="text-[8px] font-black text-foreground/30 uppercase tracking-[0.2em]">Efficiency</span>
-                        <div className="h-1 bg-foreground/5 rounded-full mt-1.5 overflow-hidden border border-white/5">
-                           <div className="h-full bg-primary w-[82%] shadow-[0_0_10px_oklch(var(--primary))]" />
-                        </div>
-                     </div>
-                  </div>
-                </div>
+                <p className="text-[9px] font-bold text-primary uppercase tracking-widest mb-0.5">Formación</p>
+                <p className="text-2xl font-black text-white">{formation}</p>
               </motion.div>
             </div>
           </div>

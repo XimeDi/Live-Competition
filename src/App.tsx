@@ -12,6 +12,8 @@ import { Leaderboard } from "./pages/Leaderboard"
 import { Profile } from "./pages/Profile"
 import { Admin } from "./pages/Admin"
 
+import { Toaster } from "sonner"
+
 const router = createBrowserRouter([
   {
     path: "/",
@@ -28,8 +30,6 @@ const router = createBrowserRouter([
   { path: "/register", element: <PageTransition><Register /></PageTransition> },
   { path: "/admin", element: <Admin /> },
 ])
-
-import { Toaster } from 'sonner'
 
 function App() {
   return (

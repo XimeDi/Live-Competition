@@ -1,126 +1,188 @@
-# ⚽ Fantasy World Cup 2026
+# Fantasy Copa del Mundo 2026
 
-A production-ready fantasy football platform for the FIFA World Cup 2026. Build your dream squad, compete globally, and track your performance in a stunning, responsive interface.
+Plataforma de fantasy football para el Mundial 2026. Los usuarios crean su equipo de 11 jugadores, el administrador registra los resultados de los partidos y los puntos se distribuyen automáticamente a todos los participantes.
 
-## 🚀 Quick Start
+---
 
-### Docker Compose (one command)
+## Stack tecnológico
 
-From project root:
+| Capa | Tecnología |
+|------|------------|
+| Frontend | React 19 · Vite · TypeScript · Tailwind CSS · shadcn/ui |
+| Estado | Zustand (persistido) · TanStack Query |
+| Animaciones | Framer Motion |
+| Formularios | React Hook Form · Zod |
+| Backend | Fastify v5 · Node.js 22 · TypeScript |
+| **Base de datos** | **PostgreSQL 16** (usuarios, equipos, partidos) |
+| ORM | Prisma 5 |
+| Caché | Redis 7 (leaderboard en tiempo real) |
+| Búsqueda | Meilisearch v1.8 (preparado) |
+| Infraestructura | Docker Compose |
+
+---
+
+## Inicio rápido con Docker (recomendado)
+
+> Requisito: Docker y Docker Compose instalados.
 
 ```bash
+# 1. Clona el repositorio
+git clone https://github.com/XimeDi/Live-Competition.git
+cd Live-Competition
+
+# 2. Ajusta las variables de entorno (opcional, hay valores por defecto)
+#    Edita ADMIN_SECRET y JWT_SECRET antes de ir a producción.
+
+# 3. Levanta toda la plataforma con un solo comando
 docker compose up --build
 ```
 
-Then open `http://localhost:3000`.
+| Servicio | URL |
+|----------|-----|
+| Frontend | http://localhost:3000 |
+| API | http://localhost:3001 |
+| Panel admin | http://localhost:3000/admin |
 
-Optional: seed 500 users (in another terminal):
+---
 
-```bash
-docker compose exec api npm run seed
-```
+## Desarrollo local
 
-**Frontend** (from project root):
+### Prerrequisitos
+- Node.js 22+
+- Docker (para las bases de datos)
 
-```bash
-npm install
-npm run dev
-```
-
-Open [http://localhost:5173](http://localhost:5173) in your browser.
-
-**Backend** (in another terminal, required for login/register, leaderboard, and player search):
-
-1. Run **Redis** and **Meilisearch**, for example:
+### 1. Levantar bases de datos
 
 ```bash
-docker run -d --name redis-live -p 6379:6379 redis:7-alpine
-docker run -d --name meili-live -p 7700:7700 \
-  -e MEILI_MASTER_KEY=masterKey \
-  getmeili/meilisearch:v1.11
+docker compose up db redis -d
 ```
 
-2. Configure `server/.env` (copy from `.env.example`): `REDIS_URL`, `MEILISEARCH_HOST` (e.g. `http://127.0.0.1:7700`), `MEILISEARCH_API_KEY` (same as `MEILI_MASTER_KEY` if you use the command above), and `JWT_SECRET`.
-
-3. Start the API:
+### 2. Backend
 
 ```bash
 cd server
+cp .env.example .env       # configura DATABASE_URL, JWT_SECRET, ADMIN_SECRET
 npm install
-npm run dev
+npm run db:generate        # genera el cliente Prisma
+npm run db:migrate         # aplica las migraciones SQL
+npm run dev                # http://localhost:3001
 ```
 
-On first start, the server **indexes** `src/data/players.json` into Meilisearch if the index is empty (can take a few minutes). To reindex manually: `npm run search:index`.
-
-User accounts and leaderboard use **Redis**; **player search** uses **Meilisearch** (`GET /api/search`, `GET /api/search/meta`). The API listens on [http://localhost:3001](http://localhost:3001). Vite proxies `/auth` and `/api` to that port during `npm run dev`.
-
-## 🧱 Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Framework | React 19 + Vite |
-| Language | TypeScript (strict) |
-| Styling | Tailwind CSS + shadcn/ui |
-| State | Zustand (persisted) |
-| Data Fetching | TanStack React Query |
-| Forms | React Hook Form + Zod |
-| Animations | Framer Motion |
-| Routing | React Router v7 |
-| Icons | Lucide React |
-
-## 📄 Pages
-
-- **Login / Register** — Zod-validated forms with session persistence
-- **Dashboard** — Points, global rank, and quick actions with skeleton loaders
-- **Player Search** — Name search from 2+ characters (debounced), suggestions API, filters (position, multi-nationality OR, club, OVR/price range), AND logic across groups, infinite scroll  
-- **Squad Builder** — Visual football pitch with formation selector (4-3-3, 4-4-2, 3-5-2), budget cap, and max 3 per country validation
-- **Leaderboard** — Global rankings with "Find Me" button and infinite scroll pagination
-- **Profile** — Saved squad overview, points breakdown per match, and account management
-
-## 🏗️ Project Structure
-
-```
-src/
-├── components/       # Shared UI components (Navbar, PageTransition, shadcn)
-│   ├── layout/       # RootLayout, Navbar
-│   └── ui/           # shadcn/ui components
-├── hooks/            # Custom hooks (useDebounce)
-├── lib/              # Utilities and Zod schemas
-├── pages/            # Route-level page components
-├── providers/        # ThemeProvider (dark/light)
-├── services/api/     # API client (auth + mock players/leaderboard)
-├── store/            # Zustand stores (auth, squad)
-└── types/            # TypeScript interfaces
-```
-
-## ⚙️ API Endpoints (Expected Backend)
-
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/auth/login` | Authenticate user |
-| POST | `/auth/register` | Create new account |
-| GET | `/api/search` | Search players |
-| GET | `/api/search/suggest` | Name autocomplete (`q` min 2 chars) |
-| GET | `/api/search/meta` | Facet lists (nationalities, clubs) |
-| GET | `/api/squad` | Get user's squad |
-| POST | `/api/squad` | Save user's squad |
-| GET | `/api/leaderboard` | Global leaderboard |
-| GET | `/api/user/me` | Current user info |
-
-> **Auth**, **leaderboard** (`GET /api/leaderboard`), and **player search** (`GET /api/search`, `GET /api/search/meta`, `GET /api/search/suggest`) are wired to the real server in `server/` (Redis + Meilisearch). Squad persistence still uses mock/local state until that API exists.
-
-**Player search API (`GET /api/search`)** (non-exhaustive): `q` (omitted or 0–1 chars = **no text ranking**, still returns filter-only results; **2+** runs fuzzy name search), `nationality` or **`nationalities`** (comma-separated, OR within group), `club` or **`clubs`** (comma-separated), `position`, `minRating`, **`maxRating`**, **`minPrice`**, `maxPrice`, `page`, `limit`. Filters combine with **AND**; multiple nationalities/clubs use **OR** inside that group. **`GET /api/search/suggest`**: `q` (min 2), `limit` (default 8, max 20). After changing index fields, run `cd server && npm run search:index` to reindex.
-
-## 🎨 Design
-
-- **Theme**: FIFA World Cup inspired dark mode with vibrant purple accents
-- **Responsive**: Mobile-first design, works on all screen sizes
-- **Animations**: Framer Motion page transitions and micro-animations
-- **Loading**: Skeleton loaders throughout (no spinners)
-
-## 📦 Build for Production
+### 3. Frontend
 
 ```bash
-npm run build
-npm run preview
+# desde la raíz del proyecto
+npm install
+npm run dev                # http://localhost:5173
 ```
+
+---
+
+## Variables de entorno del servidor
+
+| Variable | Descripción | Valor ejemplo |
+|----------|-------------|---------------|
+| `DATABASE_URL` | Conexión PostgreSQL | `postgresql://fantasy:fantasy@localhost:5432/fantasy_wc` |
+| `REDIS_URL` | Conexión Redis | `redis://localhost:6379` |
+| `JWT_SECRET` | Clave secreta JWT | *(cadena aleatoria larga)* |
+| `JWT_EXPIRES_IN` | Duración del token | `30d` |
+| `PORT` | Puerto del servidor | `3001` |
+| `CORS_ORIGIN` | Origen CORS | `http://localhost:5173` |
+| `ADMIN_SECRET` | Contraseña del panel admin | *(contraseña segura)* |
+
+---
+
+## Panel de administración
+
+Accede en `/admin`. No requiere cuenta de usuario — solo la `ADMIN_SECRET`.
+
+**Funcionalidades:**
+- Ver todos los partidos agrupados por grupo
+- **Resultado real** — introduce marcador y guarda
+- **Simular partido** — resultado aleatorio con distribución realista
+- **Reiniciar partido** — vuelve a estado "Por jugar"
+- Estadísticas globales: usuarios, equipos, partidos jugados
+
+Al registrar un resultado, el servidor calcula y distribuye los puntos automáticamente a todos los usuarios con jugadores de las selecciones involucradas.
+
+---
+
+## Sistema de puntos
+
+| Evento | Puntos |
+|--------|--------|
+| Jugador participa | +2 |
+| Su selección gana | +6 |
+| Empate | +3 |
+| Su selección pierde | +1 |
+| Gol de su selección | +2 por gol |
+
+---
+
+## Reglas del equipo
+
+- 11 jugadores (1 GK · DEF · MID · FWD según formación)
+- Presupuesto inicial: **1.000M**
+- Máximo **3 jugadores** de la misma selección
+- Formaciones: **4-3-3 · 4-4-2 · 3-5-2**
+
+---
+
+## Estructura del proyecto
+
+```
+Live-Competition/
+├── src/                    # Frontend React
+│   ├── pages/              # Home, Search, SquadBuilder, Leaderboard, Profile, Admin
+│   ├── components/         # UI, layout, MatchSimulator, BroadcastTicker
+│   ├── store/              # Zustand (auth, squad, ui)
+│   ├── services/api/       # Clientes HTTP (auth, squad, matches, leaderboard)
+│   └── hooks/              # useDebounce, useSquadSync
+├── server/                 # Backend Fastify
+│   ├── src/
+│   │   ├── routes/         # auth, user, squad, matches, admin, leaderboard
+│   │   ├── lib/            # db, redis, jwt, leaderboard, pointsCalculator, seedMatches
+│   │   └── middleware/     # requireAuth, requireAdmin
+│   └── prisma/
+│       ├── schema.prisma   # Esquema de la base de datos
+│       └── migrations/     # Migraciones SQL versionadas
+├── docker-compose.yml      # Orquestación completa (PostgreSQL · Redis · Meilisearch · API · Frontend)
+├── Dockerfile              # Imagen de producción del frontend (nginx)
+├── nginx.conf              # Proxy inverso + fallback SPA
+└── ARCHITECTURE.md         # Documento de arquitectura detallado
+```
+
+---
+
+## API — Referencia rápida
+
+### Pública
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | `/auth/register` | Crear cuenta |
+| POST | `/auth/login` | Iniciar sesión |
+| GET | `/api/matches` | Lista de partidos |
+| GET | `/api/leaderboard` | Clasificación global |
+
+### Con autenticación (Bearer JWT)
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/user/me` | Datos del usuario |
+| GET | `/api/squad` | Equipo guardado |
+| POST | `/api/squad` | Guardar equipo |
+
+### Administración (Header `X-Admin-Secret`)
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/admin/matches` | Todos los partidos |
+| PUT | `/api/admin/matches/:id/result` | Registrar resultado |
+| POST | `/api/admin/matches/:id/simulate` | Simular resultado |
+| POST | `/api/admin/matches/:id/reset` | Reiniciar partido |
+| DELETE | `/api/admin/matches/:id` | Eliminar partido |
+| GET | `/api/admin/stats` | Estadísticas globales |
+
+---
+
+## Arquitectura detallada
+
+Ver [ARCHITECTURE.md](./ARCHITECTURE.md)

@@ -7,36 +7,19 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getLeaderboard } from '@/services/api/leaderboard'
 import { useAuthStore } from '@/store/useAuthStore'
-import { useUiStore } from "@/store/useUiStore"
-import { translations } from "@/lib/translations"
+import { useUiStore } from '@/store/useUiStore'
+import { translations } from '@/lib/translations'
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.03
-    }
-  }
-}
-
-const rowVariants = {
-  hidden: { x: -10, opacity: 0 },
-  visible: {
-    x: 0,
-    opacity: 1,
-    transition: {
-      type: 'spring' as const,
-      stiffness: 100,
-      damping: 15
-    }
-  }
+const MEDAL_STYLES: Record<number, { bg: string; text: string; label: string }> = {
+  1: { bg: 'bg-amber-400/10 border-amber-400/30',  text: 'text-amber-400',  label: '🥇' },
+  2: { bg: 'bg-slate-300/10 border-slate-300/30',  text: 'text-slate-300',  label: '🥈' },
+  3: { bg: 'bg-amber-700/10 border-amber-600/30',  text: 'text-amber-600',  label: '🥉' },
 }
 
 export function Leaderboard() {
   const { user } = useAuthStore()
   const { language } = useUiStore()
-  const scoringT = translations[language].scoring
+  const t = translations[language].leaderboard
   const myRowRef = useRef<HTMLTableRowElement>(null)
 
   const {
@@ -56,141 +39,173 @@ export function Leaderboard() {
     myRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [])
 
-  const entries = data?.pages.flatMap((page) => page.data) ?? []
-
+  const entries = data?.pages.flatMap(page => page.data) ?? []
+  const top3 = entries.slice(0, 3)
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Stadium Backdrop */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1543351611-58f69d7c1781?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-5 grayscale" />
-        <div className="absolute inset-0 bg-gradient-to-b from-background via-background/95 to-background" />
-      </div>
+    <div className="min-h-screen bg-background">
+      <div className="h-1 w-full bg-gradient-to-r from-green-600 via-primary to-green-600" />
 
-      <div className="container relative z-10 py-10 space-y-12">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b-4 border-primary/20 pb-8">
-          <motion.div
-             initial={{ opacity: 0, x: -20 }}
-             animate={{ opacity: 1, x: 0 }}
-          >
-            <div className="flex items-center gap-2 text-primary mb-2">
-              <Trophy className="h-4 w-4" />
-              <span className="text-[10px] font-oswald font-black uppercase tracking-[0.4em]">Global Standings // FIFA 2026</span>
+      <div className="container py-8 space-y-8">
+
+        {/* ── Header ── */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Trophy className="h-4 w-4 text-secondary" />
+              <span className="text-xs font-semibold text-secondary uppercase tracking-widest">{t.worldRanking}</span>
             </div>
-            <h1 className="text-6xl md:text-8xl font-oswald font-black tracking-tighter uppercase italic leading-[0.8]">
-              WORLD <span className="text-primary italic">RANKING</span>
-            </h1>
-          </motion.div>
-          <Button 
-            variant="outline" 
-            onClick={scrollToMe} 
-            className="h-14 px-10 font-oswald font-black uppercase tracking-widest border-2 border-primary/20 hover:bg-primary hover:text-black transition-all gap-3 bg-card/40 backdrop-blur-xl rounded-xl"
+            <h1 className="text-2xl font-bold text-foreground">{t.title}</h1>
+            <p className="text-sm text-foreground/50 mt-0.5">{t.subtitle}</p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={scrollToMe}
+            className="h-10 px-5 font-semibold text-sm border-primary/30 hover:bg-primary hover:text-black transition-all gap-2 self-start sm:self-auto"
           >
-            <Search className="h-4 w-4" /> FIND MY SQUAD
+            <Search className="h-4 w-4" /> {t.findMe}
           </Button>
         </div>
 
-        {/* F4.3 — scoring rules visible */}
-        <div className="rounded-3xl border-2 border-white/5 bg-card/30 backdrop-blur-3xl p-8">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h2 className="font-oswald font-black uppercase tracking-widest italic text-lg text-foreground">{scoringT.title}</h2>
-              <p className="text-sm text-muted-foreground font-barlow font-bold mt-1">
-                {scoringT.win} · {scoringT.draw} · {scoringT.loss}
-              </p>
-            </div>
-            <div className="text-[10px] font-black font-barlow uppercase tracking-[0.4em] text-foreground/30">
-              Team result → player nationality → points
-            </div>
-          </div>
-        </div>
+        {/* ── Podium top 3 ── */}
+        {status === 'success' && top3.length === 3 && (
+          <div className="grid grid-cols-3 gap-3 sm:gap-6">
+            {/* 2nd */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className={`rounded-2xl border p-4 text-center flex flex-col items-center gap-2 ${MEDAL_STYLES[2].bg}`}
+            >
+              <span className="text-2xl sm:text-3xl">🥈</span>
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-foreground/10 flex items-center justify-center">
+                <span className="font-black text-lg sm:text-xl text-foreground/60">
+                  {top3[1].username.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <p className="font-bold text-xs sm:text-sm text-foreground truncate max-w-full">{top3[1].username}</p>
+              <p className={`font-black text-base sm:text-lg ${MEDAL_STYLES[2].text}`}>{top3[1].points.toLocaleString()}</p>
+              <p className="text-[9px] text-foreground/30 uppercase tracking-wider">{t.pts}</p>
+            </motion.div>
 
-        <div className="rounded-[2.5rem] border-2 border-white/5 overflow-hidden bg-foreground/5 backdrop-blur-3xl shadow-[0_50px_100px_rgba(0,0,0,0.6)]">
+            {/* 1st */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0 }}
+              className={`rounded-2xl border p-4 text-center flex flex-col items-center gap-2 -mt-4 sm:-mt-6 ${MEDAL_STYLES[1].bg} shadow-lg shadow-amber-400/10`}
+            >
+              <span className="text-3xl sm:text-4xl">🥇</span>
+              <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-xl bg-amber-400/20 border border-amber-400/30 flex items-center justify-center">
+                <span className="font-black text-xl sm:text-2xl text-amber-400">
+                  {top3[0].username.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <p className="font-bold text-sm text-foreground truncate max-w-full">{top3[0].username}</p>
+              <p className={`font-black text-xl sm:text-2xl ${MEDAL_STYLES[1].text}`}>{top3[0].points.toLocaleString()}</p>
+              <p className="text-[9px] text-foreground/30 uppercase tracking-wider">{t.pts}</p>
+            </motion.div>
+
+            {/* 3rd */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className={`rounded-2xl border p-4 text-center flex flex-col items-center gap-2 ${MEDAL_STYLES[3].bg}`}
+            >
+              <span className="text-2xl sm:text-3xl">🥉</span>
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-foreground/10 flex items-center justify-center">
+                <span className="font-black text-lg sm:text-xl text-amber-700">
+                  {top3[2].username.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <p className="font-bold text-xs sm:text-sm text-foreground truncate max-w-full">{top3[2].username}</p>
+              <p className={`font-black text-base sm:text-lg ${MEDAL_STYLES[3].text}`}>{top3[2].points.toLocaleString()}</p>
+              <p className="text-[9px] text-foreground/30 uppercase tracking-wider">{t.pts}</p>
+            </motion.div>
+          </div>
+        )}
+
+        {/* ── Table ── */}
+        <div className="rounded-2xl border border-border/60 bg-card/60 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
+            <table className="w-full text-sm">
               <thead>
-                <tr className="bg-primary border-b-2 border-black/10">
-                  <th className="text-left py-6 px-12 font-oswald font-black uppercase tracking-widest text-black italic text-xs">Pos</th>
-                  <th className="text-left py-6 px-12 font-oswald font-black uppercase tracking-widest text-black italic text-xs">Manager</th>
-                  <th className="text-right py-6 px-12 font-oswald font-black uppercase tracking-widest text-black italic text-xs">Rating Points</th>
+                <tr className="border-b border-border/40 bg-foreground/[0.03]">
+                  <th className="text-left py-4 px-5 text-[10px] font-semibold text-foreground/40 uppercase tracking-widest">{t.rank}</th>
+                  <th className="text-left py-4 px-5 text-[10px] font-semibold text-foreground/40 uppercase tracking-widest">{t.manager}</th>
+                  <th className="text-right py-4 px-5 text-[10px] font-semibold text-foreground/40 uppercase tracking-widest">{t.points}</th>
                 </tr>
               </thead>
               <AnimatePresence mode="popLayout">
-                <motion.tbody
-                  variants={containerVariants}
-                  initial="hidden"
-                  animate="visible"
-                >
+                <motion.tbody>
                   {status === 'pending' ? (
                     Array.from({ length: 10 }).map((_, i) => (
-                      <tr key={i} className="border-b border-white/5 opacity-50">
-                        <td className="py-8 px-12"><Skeleton className="h-10 w-10 rounded-lg" /></td>
-                        <td className="py-8 px-12"><Skeleton className="h-10 w-64 rounded-lg" /></td>
-                        <td className="py-8 px-12 text-right"><Skeleton className="h-10 w-24 ml-auto rounded-lg" /></td>
+                      <tr key={i} className="border-b border-border/30">
+                        <td className="py-5 px-5"><Skeleton className="h-8 w-8 rounded-lg" /></td>
+                        <td className="py-5 px-5"><Skeleton className="h-8 w-48 rounded-lg" /></td>
+                        <td className="py-5 px-5 text-right"><Skeleton className="h-8 w-20 ml-auto rounded-lg" /></td>
                       </tr>
                     ))
                   ) : status === 'error' ? (
                     <tr>
-                      <td colSpan={3} className="text-center py-32">
-                        <h3 className="text-4xl font-oswald font-black text-destructive italic uppercase">Connection Lost</h3>
-                        <p className="font-barlow font-bold opacity-70">Server synchronization failed.</p>
-                      </td>
+                      <td colSpan={3} className="text-center py-16 text-foreground/40 text-sm">{t.error}</td>
                     </tr>
                   ) : (
-                    entries.map((entry) => {
+                    entries.map((entry, idx) => {
                       const isMe = user?.username === entry.username || user?.id === entry.userId
+                      const medal = MEDAL_STYLES[entry.rank]
                       return (
                         <motion.tr
                           key={entry.userId}
-                          variants={rowVariants}
-                          // @ts-ignore - ref on motion component
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: Math.min(idx * 0.02, 0.3) }}
+                          // @ts-ignore
                           ref={isMe ? myRowRef : undefined}
-                          className={`transition-all duration-300 group border-b border-white/5 ${
-                            isMe
-                              ? 'bg-primary/20 relative after:absolute after:left-0 after:top-0 after:bottom-0 after:w-2 after:bg-primary'
-                              : 'hover:bg-foreground/5'
+                          className={`border-b border-border/30 transition-colors group ${
+                            isMe ? 'bg-primary/10 border-primary/20' : 'hover:bg-foreground/[0.03]'
                           }`}
                         >
-                          <td className="py-8 px-12">
-                            <div className="flex items-center text-4xl font-oswald font-black italic">
-                              {entry.rank <= 3 ? (
-                                <div className="flex items-center gap-4">
-                                  <span className={entry.rank === 1 ? 'text-secondary' : entry.rank === 2 ? 'text-slate-300' : 'text-amber-600'}>
-                                    {entry.rank.toString().padStart(2, '0')}
-                                  </span>
-                                </div>
-                              ) : (
-                                <span className="text-foreground/20 group-hover:text-primary/60 transition-colors">
-                                  {entry.rank.toString().padStart(2, '0')}
-                                </span>
-                              )}
-                            </div>
+                          <td className="py-4 px-5">
+                            {medal ? (
+                              <span className="text-xl">{medal.label}</span>
+                            ) : (
+                              <span className={`text-lg font-black tabular-nums ${
+                                isMe ? 'text-primary' : 'text-foreground/30 group-hover:text-foreground/50'
+                              }`}>
+                                {entry.rank.toString().padStart(2, '0')}
+                              </span>
+                            )}
                           </td>
-                          <td className="py-8 px-12">
-                            <div className="flex items-center gap-8">
-                              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-oswald font-black shrink-0 border-2 transition-all duration-500 ${
-                                isMe ? 'border-primary bg-primary text-black' : 'border-white/10 bg-foreground/5 text-foreground/40 group-hover:border-primary/40'
+                          <td className="py-4 px-5">
+                            <div className="flex items-center gap-3">
+                              <div className={`h-9 w-9 rounded-xl flex items-center justify-center text-base font-black border transition-all ${
+                                isMe
+                                  ? 'bg-primary/20 border-primary/40 text-primary'
+                                  : 'bg-foreground/5 border-border/40 text-foreground/40 group-hover:border-border/60'
                               }`}>
                                 {entry.username.charAt(0).toUpperCase()}
                               </div>
-                              <div className="flex flex-col">
-                                <span className={`text-3xl font-oswald font-black uppercase tracking-tighter italic ${isMe ? 'text-primary' : 'text-foreground'}`}>
+                              <div>
+                                <p className={`font-semibold ${isMe ? 'text-primary' : 'text-foreground'}`}>
                                   {entry.username}
-                                </span>
-                                <div className="flex items-center gap-2">
-                                  <span className={`h-2 w-2 rounded-full ${isMe ? 'bg-primary' : 'bg-emerald-500'} animate-pulse`} />
-                                  <span className="text-[10px] text-foreground/30 font-black uppercase tracking-[0.2em]">Verified Manager</span>
+                                  {isMe && <span className="ml-2 text-[10px] text-primary/60 font-normal">{t.you}</span>}
+                                </p>
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                  <span className="text-[10px] text-foreground/30">{t.verifiedManager}</span>
                                 </div>
                               </div>
                             </div>
                           </td>
-                          <td className="py-8 px-12 text-right">
-                            <div className="flex flex-col items-end">
-                              <span className={`text-5xl font-oswald font-black italic tracking-tighter ${isMe ? 'text-primary' : 'text-foreground group-hover:text-primary transition-colors'}`}>
-                                {entry.points.toLocaleString()}
-                              </span>
-                              <span className="text-[10px] font-black text-foreground/20 uppercase tracking-[0.3em] mt-1 italic">World Pts</span>
-                            </div>
+                          <td className="py-4 px-5 text-right">
+                            <span className={`text-xl font-black tabular-nums ${
+                              isMe ? 'text-primary' : 'text-foreground group-hover:text-primary transition-colors'
+                            }`}>
+                              {entry.points.toLocaleString()}
+                            </span>
+                            <p className="text-[10px] text-foreground/30 mt-0.5">{t.pts}</p>
                           </td>
                         </motion.tr>
                       )
@@ -202,20 +217,17 @@ export function Leaderboard() {
           </div>
 
           {hasNextPage && (
-            <div className="p-12 text-center border-t border-white/5 bg-black/20">
+            <div className="p-6 text-center border-t border-border/40">
               <Button
-                variant="ghost"
+                variant="outline"
                 onClick={() => fetchNextPage()}
                 disabled={isFetchingNextPage}
-                className="h-16 px-16 font-oswald font-black uppercase tracking-[0.3em] italic border-2 border-primary/20 hover:bg-primary hover:text-black transition-all shadow-2xl group/btn rounded-2xl"
+                className="h-10 px-8 font-semibold text-sm gap-2 hover:bg-primary hover:text-black hover:border-primary transition-all"
               >
                 {isFetchingNextPage ? (
-                  <div className="h-6 w-6 animate-spin rounded-full border-4 border-primary border-r-transparent" />
+                  <div className="h-4 w-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
                 ) : (
-                  <div className="flex items-center gap-4">
-                    <ArrowDown className="h-5 w-5 group-hover/btn:translate-y-1 transition-transform text-primary" />
-                    Load More Rankings
-                  </div>
+                  <><ArrowDown className="h-4 w-4" /> {t.loadMore}</>
                 )}
               </Button>
             </div>

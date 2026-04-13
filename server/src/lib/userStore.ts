@@ -1,85 +1,76 @@
-import { randomUUID } from "node:crypto"
-import { redis } from "./redis.js"
+import { db } from "./db.js"
 import type { StoredUserRecord } from "./user.js"
 
-const emailKey = (email: string) => `user:email:${email.toLowerCase()}`
-const usernameKey = (username: string) => `user:username:${username.toLowerCase()}`
-const idKey = (id: string) => `user:id:${id}`
-/** Set containing all user IDs — used by the scoring engine to iterate users. */
-const ALL_USERS_KEY = "users:all"
-
 export type CreateUserConflict = "email" | "username"
+
+function toStoredRecord(user: {
+  id: string
+  email: string
+  username: string
+  passwordHash: string
+  points: number
+  createdAt: Date
+}): StoredUserRecord {
+  return {
+    id: user.id,
+    email: user.email,
+    username: user.username,
+    passwordHash: user.passwordHash,
+    points: user.points,
+    rank: 0,
+    createdAt: user.createdAt.toISOString(),
+  }
+}
 
 export async function createUserInStore(input: {
   username: string
   email: string
   passwordHash: string
 }): Promise<{ user: StoredUserRecord } | { conflict: CreateUserConflict }> {
-  const normEmail = input.email.toLowerCase()
-  const normUsername = input.username.toLowerCase()
-  if (await redis.exists(emailKey(normEmail))) {
-    return { conflict: "email" }
-  }
-  if (await redis.exists(usernameKey(normUsername))) {
+  const normEmail = input.email.toLowerCase().trim()
+
+  const existing = await db.user.findFirst({
+    where: {
+      OR: [
+        { email: normEmail },
+        { username: { equals: input.username, mode: "insensitive" } },
+      ],
+    },
+  })
+
+  if (existing) {
+    if (existing.email === normEmail) return { conflict: "email" }
     return { conflict: "username" }
   }
-  const id = randomUUID()
-  const user: StoredUserRecord = {
-    id,
-    email: input.email.trim(),
-    username: input.username,
-    passwordHash: input.passwordHash,
-    points: 0,
-    rank: 0,
-    createdAt: new Date().toISOString(),
-  }
-  const payload = JSON.stringify(user)
-  const multi = redis.multi()
-  multi.set(emailKey(normEmail), id)
-  multi.set(usernameKey(normUsername), id)
-  multi.set(idKey(id), payload)
-  multi.sadd(ALL_USERS_KEY, id)
-  await multi.exec()
-  return { user }
+
+  const user = await db.user.create({
+    data: {
+      email: normEmail,
+      username: input.username,
+      passwordHash: input.passwordHash,
+      points: 0,
+    },
+  })
+
+  return { user: toStoredRecord(user) }
 }
 
 export async function findUserByEmail(email: string): Promise<StoredUserRecord | null> {
-  const id = await redis.get(emailKey(email))
-  if (!id) return null
-  return findUserById(id)
+  const user = await db.user.findUnique({ where: { email: email.toLowerCase().trim() } })
+  if (!user) return null
+  return toStoredRecord(user)
 }
 
 export async function findUserById(id: string): Promise<StoredUserRecord | null> {
-  const raw = await redis.get(idKey(id))
-  if (!raw) return null
-  try {
-    return JSON.parse(raw) as StoredUserRecord
-  } catch {
-    return null
-  }
+  const user = await db.user.findUnique({ where: { id } })
+  if (!user) return null
+  return toStoredRecord(user)
 }
 
-/** Update user's accumulated points and persist back to Redis. */
-export async function updateUserPoints(id: string, additionalPoints: number): Promise<number> {
-  const user = await findUserById(id)
-  if (!user) return 0
-  const newPoints = user.points + additionalPoints
-  const updated: StoredUserRecord = { ...user, points: newPoints }
-  await redis.set(idKey(id), JSON.stringify(updated))
-  return newPoints
-}
-
-/** Set user's accumulated points (used by seed scripts / admin tooling). */
-export async function setUserPoints(id: string, absolutePoints: number): Promise<number> {
-  const user = await findUserById(id)
-  if (!user) return 0
-  const points = Math.max(0, Math.floor(absolutePoints))
-  const updated: StoredUserRecord = { ...user, points }
-  await redis.set(idKey(id), JSON.stringify(updated))
-  return points
-}
-
-/** Return all registered user IDs. Used by the scoring engine. */
-export async function getAllUserIds(): Promise<string[]> {
-  return redis.smembers(ALL_USERS_KEY)
+export async function addUserPoints(userId: string, delta: number): Promise<number> {
+  const user = await db.user.update({
+    where: { id: userId },
+    data: { points: { increment: delta } },
+  })
+  return user.points
 }

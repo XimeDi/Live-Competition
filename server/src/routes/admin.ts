@@ -1,51 +1,153 @@
-/**
- * Admin routes (F4.1) — protected by a simple API-key check so the professor
- * can enter match results without a full user account.
- *
- * Header required:  X-Admin-Key: <value of ADMIN_KEY env var>
- */
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
+import type { FastifyInstance } from "fastify"
 import { z } from "zod"
-import { addMatch, getAllMatches } from "../lib/matchStore.js"
+import { requireAdmin } from "../middleware/requireAdmin.js"
+import { db } from "../lib/db.js"
+import { calculateMatchPoints } from "../lib/pointsCalculator.js"
 
-async function requireAdminKey(request: FastifyRequest, reply: FastifyReply) {
-  const adminKey = process.env.ADMIN_KEY
-  if (!adminKey) {
-    return reply.status(503).send({ error: "Admin access not configured (ADMIN_KEY not set)" })
+// Weighted random score generator (same distribution as the original simulator)
+const SCORE_POOL: [number, number][] = [
+  [0, 0], [1, 0], [0, 1], [1, 1],
+  [2, 0], [0, 2], [2, 1], [1, 2],
+  [2, 2], [3, 0], [0, 3], [3, 1],
+  [1, 3], [3, 2], [2, 3], [4, 0],
+  [0, 4], [4, 1], [1, 4], [5, 0],
+]
+const SCORE_WEIGHTS = [4, 10, 10, 8, 8, 8, 10, 10, 5, 5, 5, 7, 7, 5, 5, 2, 2, 2, 2, 1]
+
+function weightedRandom(): [number, number] {
+  const total = SCORE_WEIGHTS.reduce((a, b) => a + b, 0)
+  let r = Math.random() * total
+  for (let i = 0; i < SCORE_WEIGHTS.length; i++) {
+    r -= SCORE_WEIGHTS[i]
+    if (r <= 0) return SCORE_POOL[i]
   }
-  const provided = request.headers["x-admin-key"]
-  if (provided !== adminKey) {
-    return reply.status(403).send({ error: "Forbidden" })
-  }
+  return [1, 0]
 }
 
-const matchBodySchema = z.object({
-  teamA: z.string().min(1),
-  teamB: z.string().min(1),
-  scoreA: z.coerce.number().int().min(0),
-  scoreB: z.coerce.number().int().min(0),
+const resultBody = z.object({
+  homeScore: z.number().int().min(0).max(20),
+  awayScore: z.number().int().min(0).max(20),
+})
+
+const createMatchBody = z.object({
+  groupName: z.string().min(1),
+  homeTeam: z.string().min(1),
+  awayTeam: z.string().min(1),
+  homeNationality: z.string().min(1),
+  awayNationality: z.string().min(1),
+  homeFlag: z.string().min(1),
+  awayFlag: z.string().min(1),
+  matchDate: z.string().optional(),
 })
 
 export async function adminRoutes(app: FastifyInstance) {
-  /** F4.1 — enter a match result. Triggers automatic scoring for all users. */
-  app.post("/match", { preHandler: requireAdminKey }, async (request, reply) => {
-    const parsed = matchBodySchema.safeParse(request.body)
-    if (!parsed.success) {
-      return reply.status(400).send({ error: "Invalid body", details: parsed.error.flatten() })
-    }
-    const { teamA, teamB, scoreA, scoreB } = parsed.data
-    try {
-      const match = await addMatch(teamA, teamB, scoreA, scoreB)
-      return reply.status(201).send({ match })
-    } catch (e) {
-      app.log.error(e)
-      return reply.status(500).send({ error: "Failed to process match result" })
-    }
+  // All routes in this plugin require admin authentication
+  app.addHook("preHandler", requireAdmin)
+
+  // GET /api/admin/matches
+  app.get("/matches", async (_request, reply) => {
+    const matches = await db.match.findMany({
+      orderBy: [{ groupName: "asc" }, { createdAt: "asc" }],
+    })
+    return reply.send({ matches })
   })
 
-  /** List all entered match results. */
-  app.get("/matches", { preHandler: requireAdminKey }, async (_request, reply) => {
-    const matches = await getAllMatches()
-    return reply.send({ matches })
+  // POST /api/admin/matches — create a new match
+  app.post("/matches", async (request, reply) => {
+    const parsed = createMatchBody.safeParse(request.body)
+    if (!parsed.success) {
+      return reply
+        .status(400)
+        .send({ error: "Validation failed", details: parsed.error.flatten().fieldErrors })
+    }
+    const { matchDate, ...rest } = parsed.data
+    const match = await db.match.create({
+      data: {
+        ...rest,
+        matchDate: matchDate ? new Date(matchDate) : null,
+        status: "scheduled",
+      },
+    })
+    return reply.status(201).send({ match })
+  })
+
+  // PUT /api/admin/matches/:id/result — set a real result and award points
+  app.put("/matches/:id/result", async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const parsed = resultBody.safeParse(request.body)
+    if (!parsed.success) {
+      return reply
+        .status(400)
+        .send({ error: "Validation failed", details: parsed.error.flatten().fieldErrors })
+    }
+
+    const match = await db.match.findUnique({ where: { id } })
+    if (!match) return reply.status(404).send({ error: "Match not found" })
+    if (match.status === "finished") {
+      return reply.status(409).send({ error: "Match already finished — reset it first" })
+    }
+
+    const { homeScore, awayScore } = parsed.data
+    await db.match.update({ where: { id }, data: { homeScore, awayScore, status: "finished" } })
+
+    const stats = await calculateMatchPoints(
+      homeScore,
+      awayScore,
+      match.homeNationality,
+      match.awayNationality
+    )
+
+    return reply.send({ ok: true, homeScore, awayScore, ...stats })
+  })
+
+  // POST /api/admin/matches/:id/simulate — random result + award points
+  app.post("/matches/:id/simulate", async (request, reply) => {
+    const { id } = request.params as { id: string }
+
+    const match = await db.match.findUnique({ where: { id } })
+    if (!match) return reply.status(404).send({ error: "Match not found" })
+    if (match.status === "finished") {
+      return reply.status(409).send({ error: "Match already finished — reset it first" })
+    }
+
+    const [homeScore, awayScore] = weightedRandom()
+    await db.match.update({ where: { id }, data: { homeScore, awayScore, status: "finished" } })
+
+    const stats = await calculateMatchPoints(
+      homeScore,
+      awayScore,
+      match.homeNationality,
+      match.awayNationality
+    )
+
+    return reply.send({ ok: true, homeScore, awayScore, ...stats })
+  })
+
+  // POST /api/admin/matches/:id/reset — revert to scheduled (removes result)
+  app.post("/matches/:id/reset", async (request, reply) => {
+    const { id } = request.params as { id: string }
+    await db.match.update({
+      where: { id },
+      data: { homeScore: null, awayScore: null, status: "scheduled" },
+    })
+    return reply.send({ ok: true })
+  })
+
+  // DELETE /api/admin/matches/:id — delete a match entirely
+  app.delete("/matches/:id", async (request, reply) => {
+    const { id } = request.params as { id: string }
+    await db.match.delete({ where: { id } })
+    return reply.send({ ok: true })
+  })
+
+  // GET /api/admin/stats — global platform stats
+  app.get("/stats", async (_request, reply) => {
+    const [userCount, squadCount, matchCount, finishedCount] = await Promise.all([
+      db.user.count(),
+      db.squad.count(),
+      db.match.count(),
+      db.match.count({ where: { status: "finished" } }),
+    ])
+    return reply.send({ userCount, squadCount, matchCount, finishedCount })
   })
 }

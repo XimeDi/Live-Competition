@@ -11,6 +11,8 @@ export interface Player {
   price: number
 }
 
+export type SortOption = 'rating_desc' | 'rating_asc' | 'price_desc' | 'price_asc' | 'name_asc'
+
 export interface SearchFilters {
   /** Sent to API only when length >= 2 (F2.1). */
   query: string
@@ -23,6 +25,7 @@ export interface SearchFilters {
   maxRating: number
   minPrice: number
   maxPrice: number
+  sortBy?: SortOption
 }
 
 export interface PaginatedResponse<T> {

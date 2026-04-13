@@ -1,6 +1,5 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
-import { logoutAccount } from "@/services/api/auth"
 
 export type User = {
   id: string
@@ -14,28 +13,22 @@ interface AuthState {
   token: string | null
   isAuthenticated: boolean
   login: (user: User, token: string) => void
-  /** Calls POST /auth/logout to invalidate the token server-side, then clears local state. */
-  logout: () => Promise<void>
+  logout: () => void
+  addPoints: (pts: number) => void
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       user: null,
       token: null,
       isAuthenticated: false,
       login: (user, token) => set({ user, token, isAuthenticated: true }),
-      logout: async () => {
-        const { token } = get()
-        if (token) {
-          try {
-            await logoutAccount(token)
-          } catch {
-            // Even if the server call fails, clear local state.
-          }
-        }
-        set({ user: null, token: null, isAuthenticated: false })
-      },
+      logout: () => set({ user: null, token: null, isAuthenticated: false }),
+      addPoints: (pts) =>
+        set((state) => ({
+          user: state.user ? { ...state.user, points: state.user.points + pts } : null,
+        })),
     }),
     {
       name: "fantasy-auth-storage",

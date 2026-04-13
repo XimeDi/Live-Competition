@@ -1,14 +1,15 @@
 import "dotenv/config"
 import Fastify from "fastify"
 import cors from "@fastify/cors"
-import { meili } from "./lib/meilisearch.js"
-import { bootstrapPlayersIndexIfEmpty } from "./lib/playersIndex.js"
 import { pingRedis, redis } from "./lib/redis.js"
+import { db } from "./lib/db.js"
+import { syncLeaderboardScore } from "./lib/leaderboard.js"
+import { seedMatchesIfEmpty } from "./lib/seedMatches.js"
 import { authRoutes } from "./routes/auth.js"
 import { leaderboardRoutes } from "./routes/leaderboard.js"
-import { searchRoutes } from "./routes/search.js"
 import { userRoutes } from "./routes/user.js"
 import { squadRoutes } from "./routes/squad.js"
+import { matchesRoutes } from "./routes/matches.js"
 import { adminRoutes } from "./routes/admin.js"
 
 const port = Number(process.env.PORT) || 3001
@@ -24,46 +25,56 @@ await app.register(cors, {
 await app.register(authRoutes, { prefix: "/auth" })
 await app.register(userRoutes, { prefix: "/api" })
 await app.register(leaderboardRoutes, { prefix: "/api" })
-await app.register(searchRoutes, { prefix: "/api" })
 await app.register(squadRoutes, { prefix: "/api" })
-await app.register(adminRoutes, { prefix: "/admin" })
+await app.register(matchesRoutes, { prefix: "/api" })
+await app.register(adminRoutes, { prefix: "/api/admin" })
 
 app.get("/health", async (_request, reply) => {
   const redisOk = await pingRedis()
-  const meiliOk = await meili.isHealthy()
-  if (!redisOk || !meiliOk) {
-    return reply.status(503).send({ ok: false, redis: redisOk, meilisearch: meiliOk })
+  try {
+    await db.$queryRaw`SELECT 1`
+    const dbOk = true
+    if (!redisOk) {
+      return reply.status(503).send({ ok: false, redis: false, db: dbOk })
+    }
+    return { ok: true, redis: true, db: true }
+  } catch {
+    return reply.status(503).send({ ok: false, redis: redisOk, db: false })
   }
-  return { ok: true, redis: true, meilisearch: true }
 })
 
 const shutdown = async () => {
   await app.close()
   await redis.quit()
+  await db.$disconnect()
   process.exit(0)
 }
 process.on("SIGINT", () => void shutdown())
 process.on("SIGTERM", () => void shutdown())
 
 try {
+  // Verify Redis
   const redisOk = await pingRedis()
   if (!redisOk) {
-    app.log.error(
-      "Redis is not reachable. Start Redis (e.g. docker run -d -p 6379:6379 redis:7-alpine) and set REDIS_URL in .env."
-    )
+    app.log.error("Redis is not reachable. Set REDIS_URL in .env.")
     process.exit(1)
   }
-  const meiliOk = await meili.isHealthy()
-  if (!meiliOk) {
-    app.log.error(
-      "Meilisearch is not reachable. Start it (e.g. docker run -d -p 7700:7700 -e MEILI_MASTER_KEY=masterKey getmeili/meilisearch:v1.11) and set MEILISEARCH_HOST / MEILISEARCH_API_KEY in .env."
-    )
-    process.exit(1)
+
+  // Verify PostgreSQL
+  await db.$connect()
+  app.log.info("PostgreSQL connected")
+
+  // Warm up leaderboard cache from DB
+  const users = await db.user.findMany({ select: { id: true, points: true } })
+  for (const u of users) {
+    await syncLeaderboardScore(u.id, u.points)
   }
+  app.log.info(`Leaderboard synced for ${users.length} user(s)`)
+
+  // Seed initial matches if the table is empty
+  await seedMatchesIfEmpty()
+
   await app.listen({ port, host: "0.0.0.0" })
-  void bootstrapPlayersIndexIfEmpty()
-    .then(() => app.log.info("Player search index ready (Meilisearch)."))
-    .catch((err) => app.log.error({ err }, "Failed to bootstrap Meilisearch player index"))
 } catch (err) {
   app.log.error(err)
   process.exit(1)

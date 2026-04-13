@@ -3,7 +3,7 @@ import { motion } from "framer-motion"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Link, useNavigate } from "react-router-dom"
-import { Shield } from "lucide-react"
+import { Trophy } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -15,25 +15,23 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { registerSchema, type RegisterFormValues } from "@/lib/schemas"
 import { registerAccount } from "@/services/api/auth"
 import { ApiError } from "@/services/api/client"
 import { useAuthStore } from "@/store/useAuthStore"
+import { useUiStore } from "@/store/useUiStore"
+import { translations } from "@/lib/translations"
 
 export function Register() {
   const navigate = useNavigate()
   const { login } = useAuthStore()
+  const { language } = useUiStore()
+  const t = translations[language].register
   const [apiError, setApiError] = useState<string | null>(null)
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
-    defaultValues: {
-      username: "",
-      email: "",
-      password: "",
-      confirmPassword: "",
-    },
+    defaultValues: { username: "", email: "", password: "", confirmPassword: "" },
   })
 
   async function onSubmit(values: RegisterFormValues) {
@@ -50,67 +48,59 @@ export function Register() {
       if (e instanceof ApiError) {
         setApiError(e.message)
       } else {
-        setApiError("Something went wrong. Is the server running?")
+        setApiError(t.serverError)
       }
     }
   }
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center p-6 py-20">
-      {/* Stadium Backdrop */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 grayscale mix-blend-overlay" />
-        <div className="absolute inset-0 bg-gradient-to-b from-background via-background/90 to-background" />
-      </div>
+    <div className="min-h-screen bg-background flex items-center justify-center p-6 py-16">
+      <div className="fixed top-0 inset-x-0 h-1 bg-gradient-to-r from-green-600 via-primary to-green-600 z-50" />
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md relative z-10"
+        className="w-full max-w-md"
       >
-        <Card className="bg-foreground/5 backdrop-blur-3xl border-2 border-white/10 rounded-[2.5rem] overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.6)] border-t-8 border-t-primary">
-          <CardHeader className="space-y-6 text-center p-10 pb-4">
-            <div className="flex justify-center">
-              <div className="h-20 w-20 rounded-2xl bg-primary flex items-center justify-center shadow-[0_20px_40px_oklch(var(--primary)/0.3)] ">
-                <Shield className="h-10 w-10 text-black" />
+        {/* Logo */}
+        <div className="flex flex-col items-center mb-8 gap-3">
+          <div className="h-16 w-16 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
+            <Trophy className="h-8 w-8 text-black" />
+          </div>
+          <div className="text-center">
+            <p className="text-xs font-bold text-primary uppercase tracking-widest">{t.brand}</p>
+            <h1 className="text-2xl font-black text-foreground">{t.brandTitle}</h1>
+          </div>
+        </div>
+
+        {/* Card */}
+        <div className="rounded-2xl border border-border/60 bg-card/80 backdrop-blur-xl shadow-2xl overflow-hidden">
+          <div className="p-8">
+            <h2 className="text-xl font-bold text-foreground mb-1">{t.title}</h2>
+            <p className="text-sm text-foreground/50 mb-6">{t.subtitle}</p>
+
+            {apiError && (
+              <div className="mb-5 rounded-xl bg-destructive/10 border border-destructive/20 px-4 py-3">
+                <p className="text-sm text-destructive font-medium">{apiError}</p>
               </div>
-            </div>
-            <div>
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <div className="h-1 w-4 bg-primary" />
-                <span className="text-[10px] font-black font-barlow uppercase tracking-[0.4em] text-primary italic text-center">NEW MANAGER ENROLLMENT</span>
-                <div className="h-1 w-4 bg-primary" />
-              </div>
-              <CardTitle className="text-5xl font-oswald font-black tracking-tighter uppercase italic text-foreground leading-none">
-                CREATE <span className="text-primary italic">PROFILE</span>
-              </CardTitle>
-              <CardDescription className="text-foreground/40 font-oswald font-black uppercase tracking-widest text-xs mt-4 italic">
-                Enlist in the official 2026 campaign
-              </CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="p-10 pt-6">
-            {apiError ? (
-              <p className="mb-4 text-[10px] font-oswald font-black uppercase tracking-widest text-[#ff2a2a] italic text-center" role="alert">
-                {apiError}
-              </p>
-            ) : null}
+            )}
+
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
                   control={form.control}
                   name="username"
                   render={({ field }) => (
-                    <FormItem className="space-y-1.5">
-                      <FormLabel className="font-oswald font-black uppercase tracking-widest text-[10px] text-primary italic">Manager Callsign</FormLabel>
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold text-foreground/70">{t.usernameLabel}</FormLabel>
                       <FormControl>
-                        <Input 
-                          placeholder="TACTICAL_GENIUS" 
-                          className="h-12 bg-foreground/5 border-2 border-white/10 focus:border-primary/50 text-foreground font-oswald font-black italic rounded-xl px-6 placeholder:text-foreground/10 uppercase tracking-wider" 
-                          {...field} 
+                        <Input
+                          placeholder={t.usernamePlaceholder}
+                          className="h-11 bg-background/60 border-border/60 rounded-xl"
+                          {...field}
                         />
                       </FormControl>
-                      <FormMessage className="text-[10px] font-black italic uppercase" />
+                      <FormMessage className="text-xs" />
                     </FormItem>
                   )}
                 />
@@ -118,16 +108,16 @@ export function Register() {
                   control={form.control}
                   name="email"
                   render={({ field }) => (
-                    <FormItem className="space-y-1.5">
-                      <FormLabel className="font-oswald font-black uppercase tracking-widest text-[10px] text-primary italic">Registry Email</FormLabel>
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold text-foreground/70">{t.emailLabel}</FormLabel>
                       <FormControl>
-                        <Input 
-                          placeholder="IDENTIFICACION EMAIL" 
-                          className="h-12 bg-foreground/5 border-2 border-white/10 focus:border-primary/50 text-foreground font-oswald font-black italic rounded-xl px-6 placeholder:text-foreground/10 uppercase tracking-wider" 
-                          {...field} 
+                        <Input
+                          placeholder={t.emailPlaceholder}
+                          className="h-11 bg-background/60 border-border/60 rounded-xl"
+                          {...field}
                         />
                       </FormControl>
-                      <FormMessage className="text-[10px] font-black italic uppercase" />
+                      <FormMessage className="text-xs" />
                     </FormItem>
                   )}
                 />
@@ -135,17 +125,17 @@ export function Register() {
                   control={form.control}
                   name="password"
                   render={({ field }) => (
-                    <FormItem className="space-y-1.5">
-                      <FormLabel className="font-oswald font-black uppercase tracking-widest text-[10px] text-primary italic">Access Code</FormLabel>
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold text-foreground/70">{t.passwordLabel}</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="password" 
-                          placeholder="••••••••" 
-                          className="h-12 bg-foreground/5 border-2 border-white/10 focus:border-primary/50 text-foreground font-oswald font-black italic rounded-xl px-6 placeholder:text-foreground/10 tracking-[0.5em]" 
-                          {...field} 
+                        <Input
+                          type="password"
+                          placeholder={t.passwordPlaceholder}
+                          className="h-11 bg-background/60 border-border/60 rounded-xl"
+                          {...field}
                         />
                       </FormControl>
-                      <FormMessage className="text-[10px] font-black italic uppercase" />
+                      <FormMessage className="text-xs" />
                     </FormItem>
                   )}
                 />
@@ -153,40 +143,40 @@ export function Register() {
                   control={form.control}
                   name="confirmPassword"
                   render={({ field }) => (
-                    <FormItem className="space-y-1.5">
-                      <FormLabel className="font-oswald font-black uppercase tracking-widest text-[10px] text-primary italic">Confirm Code</FormLabel>
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold text-foreground/70">{t.confirmPasswordLabel}</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="password" 
-                          placeholder="••••••••" 
-                          className="h-12 bg-foreground/5 border-2 border-white/10 focus:border-primary/50 text-foreground font-oswald font-black italic rounded-xl px-6 placeholder:text-foreground/10 tracking-[0.5em]" 
-                          {...field} 
+                        <Input
+                          type="password"
+                          placeholder={t.confirmPasswordPlaceholder}
+                          className="h-11 bg-background/60 border-border/60 rounded-xl"
+                          {...field}
                         />
                       </FormControl>
-                      <FormMessage className="text-[10px] font-black italic uppercase" />
+                      <FormMessage className="text-xs" />
                     </FormItem>
                   )}
                 />
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   disabled={form.formState.isSubmitting}
-                  className="w-full h-16 bg-primary text-black hover:bg-white transition-all font-oswald font-black text-xl uppercase tracking-[0.2em] italic rounded-xl shadow-2xl shadow-primary/20 border-b-4 border-black/20 mt-4"
+                  className="w-full h-11 bg-primary text-black font-bold text-sm rounded-xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 mt-2"
                 >
-                  {form.formState.isSubmitting ? "ESTABLISHING..." : "ESTABLISH COMMAND"}
+                  {form.formState.isSubmitting ? t.submitting : t.submit}
                 </Button>
               </form>
             </Form>
-          </CardContent>
-          <CardFooter className="flex flex-col p-10 pt-0">
-            <div className="w-full h-[1px] bg-foreground/5 mb-6" />
-            <div className="text-[10px] font-black font-oswald text-center text-foreground/20 w-full uppercase tracking-widest italic">
-              Already Enlisted?{" "}
-              <Link to="/login" className="text-primary hover:text-foreground transition-colors underline-offset-8 underline decoration-primary/30 decoration-2">
-                RESUME ACCESS
+          </div>
+
+          <div className="px-8 py-5 border-t border-border/40 bg-foreground/[0.02] text-center">
+            <p className="text-sm text-foreground/50">
+              {t.hasAccount}{" "}
+              <Link to="/login" className="text-primary font-semibold hover:underline">
+                {t.signIn}
               </Link>
-            </div>
-          </CardFooter>
-        </Card>
+            </p>
+          </div>
+        </div>
       </motion.div>
     </div>
   )
