@@ -4,6 +4,22 @@ A production-ready fantasy football platform for the FIFA World Cup 2026. Build 
 
 ## 🚀 Quick Start
 
+### Docker Compose (one command)
+
+From project root:
+
+```bash
+docker compose up --build
+```
+
+Then open `http://localhost:3000`.
+
+Optional: seed 500 users (in another terminal):
+
+```bash
+docker compose exec api npm run seed
+```
+
 **Frontend** (from project root):
 
 ```bash

@@ -69,6 +69,16 @@ export async function updateUserPoints(id: string, additionalPoints: number): Pr
   return newPoints
 }
 
+/** Set user's accumulated points (used by seed scripts / admin tooling). */
+export async function setUserPoints(id: string, absolutePoints: number): Promise<number> {
+  const user = await findUserById(id)
+  if (!user) return 0
+  const points = Math.max(0, Math.floor(absolutePoints))
+  const updated: StoredUserRecord = { ...user, points }
+  await redis.set(idKey(id), JSON.stringify(updated))
+  return points
+}
+
 /** Return all registered user IDs. Used by the scoring engine. */
 export async function getAllUserIds(): Promise<string[]> {
   return redis.smembers(ALL_USERS_KEY)

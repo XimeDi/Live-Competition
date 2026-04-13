@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getLeaderboard } from '@/services/api/leaderboard'
 import { useAuthStore } from '@/store/useAuthStore'
+import { useUiStore } from "@/store/useUiStore"
+import { translations } from "@/lib/translations"
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -33,6 +35,8 @@ const rowVariants = {
 
 export function Leaderboard() {
   const { user } = useAuthStore()
+  const { language } = useUiStore()
+  const scoringT = translations[language].scoring
   const myRowRef = useRef<HTMLTableRowElement>(null)
 
   const {
@@ -84,6 +88,21 @@ export function Leaderboard() {
           >
             <Search className="h-4 w-4" /> FIND MY SQUAD
           </Button>
+        </div>
+
+        {/* F4.3 — scoring rules visible */}
+        <div className="rounded-3xl border-2 border-white/5 bg-card/30 backdrop-blur-3xl p-8">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <h2 className="font-oswald font-black uppercase tracking-widest italic text-lg text-foreground">{scoringT.title}</h2>
+              <p className="text-sm text-muted-foreground font-barlow font-bold mt-1">
+                {scoringT.win} · {scoringT.draw} · {scoringT.loss}
+              </p>
+            </div>
+            <div className="text-[10px] font-black font-barlow uppercase tracking-[0.4em] text-foreground/30">
+              Team result → player nationality → points
+            </div>
+          </div>
         </div>
 
         <div className="rounded-[2.5rem] border-2 border-white/5 overflow-hidden bg-foreground/5 backdrop-blur-3xl shadow-[0_50px_100px_rgba(0,0,0,0.6)]">

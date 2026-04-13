@@ -16,7 +16,7 @@ export function SquadBuilder() {
   const { formation, players, budget, setFormation, removePlayer, getIsComplete, syncToBackend } = useSquadStore()
   const { language } = useUiStore()
   const t = translations[language].squad
-  const { token } = useAuthStore()
+  const { token, user } = useAuthStore()
 
   const isComplete = getIsComplete()
 
@@ -54,6 +54,15 @@ export function SquadBuilder() {
                 ${budget.toFixed(1)}
               </p>
               <span className="text-sm font-oswald font-bold text-muted-foreground">M</span>
+            </div>
+          </div>
+          <div className="px-6 py-3 bg-background/40 rounded-xl border border-white/5 min-w-[140px]">
+            <p className="text-[10px] uppercase tracking-widest font-bold font-barlow text-muted-foreground mb-1">Points</p>
+            <div className="flex items-baseline gap-1">
+              <p className="text-4xl font-oswald font-bold text-secondary">
+                {user?.points ?? 0}
+              </p>
+              <span className="text-sm font-oswald font-bold text-muted-foreground">PTS</span>
             </div>
           </div>
           <div className="px-6 py-3 bg-background/40 rounded-xl border border-white/5 min-w-[140px]">

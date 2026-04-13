@@ -11,8 +11,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/auth": { target: "http://localhost:3001", changeOrigin: true },
-      "/api": { target: "http://localhost:3001", changeOrigin: true },
+      "/auth": { target: process.env.VITE_API_PROXY_TARGET ?? "http://localhost:3001", changeOrigin: true },
+      "/api": { target: process.env.VITE_API_PROXY_TARGET ?? "http://localhost:3001", changeOrigin: true },
     },
     port: 3000,
     allowedHosts: ["vexatiously-dextrocular-esteban.ngrok-free.dev"],

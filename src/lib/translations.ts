@@ -50,6 +50,12 @@ export const translations = {
       wrongPos: "Position mismatch for this tactical slot.",
       alreadyIn: "Player already in your tactical lineup!",
       selectSlot: "Please select a tactical slot on the pitch first."
+    },
+    scoring: {
+      title: "How scoring works",
+      win: "Win: +3 points per player",
+      draw: "Draw: +1 point per player",
+      loss: "Loss: +0 points per player"
     }
   },
   es: {
@@ -103,6 +109,12 @@ export const translations = {
       wrongPos: "Posición incorrecta para este puesto táctico.",
       alreadyIn: "¡Este jugador ya está en tu once titular!",
       selectSlot: "Por favor, selecciona primero un puesto en el campo."
+    },
+    scoring: {
+      title: "Cómo se calculan los puntos",
+      win: "Victoria: +3 puntos por jugador",
+      draw: "Empate: +1 punto por jugador",
+      loss: "Derrota: +0 puntos por jugador"
     }
   }
 }
