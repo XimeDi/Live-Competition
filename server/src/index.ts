@@ -56,43 +56,43 @@ const shutdown = async () => {
 process.on("SIGINT", () => void shutdown())
 process.on("SIGTERM", () => void shutdown())
 
-  try {
-    // Verify Redis
-    const redisOk = await pingRedis()
-    if (!redisOk) {
-      app.log.error("Redis is not reachable. Set REDIS_URL in .env.")
-      process.exit(1)
-    }
-
-    // Verify PostgreSQL
-    await db.$connect()
-    app.log.info("PostgreSQL connected")
-
-    // Connect MongoDB
-    await connectMongo()
-    const mongoOk = await pingMongo()
-    if (!mongoOk) {
-      app.log.error("MongoDB is not reachable. Set MONGODB_URL in .env.")
-      process.exit(1)
-    }
-    app.log.info("MongoDB connected")
-
-    // Warm up leaderboard cache from DB
-    const users = await db.user.findMany({ select: { id: true, points: true } })
-    for (const u of users) {
-      await syncLeaderboardScore(u.id, u.points)
-    }
-    app.log.info(`Leaderboard synced for ${users.length} user(s)`)
-
-    // Seed initial matches if the table is empty
-    await seedMatchesIfEmpty()
-
-    // Bootstrap MongoDB players + Meilisearch index (idempotent)
-    await bootstrapPlayersIndexIfEmpty()
-    app.log.info("Player index ready (MongoDB → Meilisearch)")
-
-    await app.listen({ port, host: "0.0.0.0" })
-  } catch (err) {
-    app.log.error(err)
+try {
+  // Verify Redis
+  const redisOk = await pingRedis()
+  if (!redisOk) {
+    app.log.error("Redis is not reachable. Set REDIS_URL in .env.")
     process.exit(1)
   }
+
+  // Verify PostgreSQL
+  await db.$connect()
+  app.log.info("PostgreSQL connected")
+
+  // Connect MongoDB
+  await connectMongo()
+  const mongoOk = await pingMongo()
+  if (!mongoOk) {
+    app.log.error("MongoDB is not reachable. Set MONGODB_URL in .env.")
+    process.exit(1)
+  }
+  app.log.info("MongoDB connected")
+
+  // Warm up leaderboard cache from DB
+  const users = await db.user.findMany({ select: { id: true, points: true } })
+  for (const u of users) {
+    await syncLeaderboardScore(u.id, u.points)
+  }
+  app.log.info(`Leaderboard synced for ${users.length} user(s)`)
+
+  // Seed initial matches if the table is empty
+  await seedMatchesIfEmpty()
+
+  // Bootstrap Meilisearch player index (idempotent — skips if already indexed)
+  await bootstrapPlayersIndexIfEmpty()
+  app.log.info("Player index ready (Meilisearch)")
+
+  await app.listen({ port, host: "0.0.0.0" })
+} catch (err) {
+  app.log.error(err)
+  process.exit(1)
+}

@@ -429,7 +429,7 @@ function AdminPanel({ adminSecret, onLogout }: { adminSecret: string; onLogout: 
                     <div className="absolute top-0 right-0 p-8 text-white/5 -mr-12 -mt-12 group-hover:scale-110 transition-transform duration-700">
                       <Zap className="h-64 w-64" />
                     </div>
-                    
+
                     <div className="relative z-10 space-y-8">
                       <div>
                         <h3 className="text-3xl font-black text-white tracking-tight uppercase italic">Match Simulation <span className="text-indigo-500">Engine</span></h3>
@@ -529,7 +529,7 @@ function AdminPanel({ adminSecret, onLogout }: { adminSecret: string; onLogout: 
                        <h3 className="text-xl font-bold text-white mb-2">Destructive Actions</h3>
                        <p className="text-sm text-slate-500">Manage critical system state and database resets.</p>
                      </div>
-                     
+
                      <div className="p-6 rounded-2xl bg-rose-500/5 border border-rose-500/10 space-y-4">
                        <p className="text-xs text-rose-500 font-bold uppercase tracking-widest leading-relaxed">
                          Warning: Resetting the tournament will clear all match results and set every manager's points to exactly zero.
@@ -546,6 +546,17 @@ function AdminPanel({ adminSecret, onLogout }: { adminSecret: string; onLogout: 
                          {resetTournamentMutation.isPending ? "Resetting..." : "Reset Tournament Database"}
                        </button>
                      </div>
+                  </div>
+
+                  {/* Scoring rules reference (F4.2) */}
+                  <div className="bg-[#0c1017] border border-white/5 rounded-3xl p-8 space-y-4">
+                    <h3 className="text-xl font-bold text-white mb-2">Sistema de puntos (F4.2)</h3>
+                    <div className="space-y-2 text-sm text-slate-400">
+                      <p>Victoria: <span className="text-indigo-400 font-bold">+3 pts</span> por jugador cuya selección gana</p>
+                      <p>Empate: <span className="text-indigo-400 font-bold">+1 pt</span> por jugador cuya selección empata</p>
+                      <p>Derrota: <span className="text-slate-600 font-bold">0 pts</span> — no se otorgan puntos</p>
+                      <p className="text-xs text-slate-600 pt-2 italic">Ejemplo: 3 jugadores brasileños + Brasil gana = 3 × 3 = 9 puntos distribuidos al manager.</p>
+                    </div>
                   </div>
                 </motion.div>
               )}

@@ -33,8 +33,8 @@ export async function userRoutes(app: FastifyInstance) {
    * F4.8 — points breakdown per match for the authenticated user.
    *
    * Data source: MongoDB MatchEvent collection (indexed on userBreakdowns.userId).
-   * Also returns all matches from PostgreSQL so the UI can show matches where
-   * the user earned 0 points.
+   * Also returns all finished matches from PostgreSQL so the UI can show matches
+   * where the user earned 0 points.
    */
   app.get(
     "/user/me/points-breakdown",

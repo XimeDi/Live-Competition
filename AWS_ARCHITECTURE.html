@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Fantasy WC 2026 — AWS Architecture</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+
+  .page { padding: 32px; max-width: 1400px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 700; color: #f8fafc; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #64748b; margin-bottom: 32px; }
+
+  /* ── AWS Cloud border ── */
+  .aws-cloud {
+    border: 2px dashed #f97316;
+    border-radius: 16px;
+    padding: 28px;
+    position: relative;
+    background: #0d1117;
+  }
+  .aws-cloud-label {
+    position: absolute;
+    top: -14px; left: 24px;
+    background: #0f1117;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #f97316;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* ── VPC border ── */
+  .vpc {
+    border: 1.5px dashed #3b82f6;
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+    background: rgba(59,130,246,0.04);
+    margin-top: 16px;
+  }
+  .vpc-label {
+    position: absolute;
+    top: -12px; left: 16px;
+    background: #0d1117;
+    padding: 1px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #3b82f6;
+    letter-spacing: 1px;
+  }
+
+  /* ── Layout grid ── */
+  .diagram { display: flex; flex-direction: column; gap: 0; }
+
+  /* Horizontal rows */
+  .row { display: flex; align-items: center; gap: 0; justify-content: center; margin-bottom: 0; }
+  .row-gap { margin-bottom: 24px; }
+
+  /* Arrows */
+  .arrow-right {
+    display: flex; align-items: center; flex-shrink: 0;
+    color: #475569; font-size: 18px; margin: 0 6px;
+  }
+  .arrow-down {
+    display: flex; justify-content: center;
+    color: #475569; font-size: 18px;
+    margin: 6px auto;
+    line-height: 1;
+  }
+  .arrow-label { font-size: 9px; color: #64748b; text-align: center; margin-top: 2px; }
+
+  /* ── Service box ── */
+  .svc {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 10px 14px; border-radius: 10px;
+    border: 1.5px solid;
+    min-width: 110px; max-width: 130px;
+    text-align: center;
+    flex-shrink: 0;
+    position: relative;
+    cursor: default;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .svc:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+  .svc-icon { font-size: 28px; margin-bottom: 5px; line-height: 1; }
+  .svc-name { font-size: 10px; font-weight: 700; line-height: 1.3; }
+  .svc-desc { font-size: 9px; color: #94a3b8; margin-top: 3px; line-height: 1.3; }
+  .badge {
+    position: absolute; top: -8px; right: -8px;
+    background: #1e293b; border: 1px solid #334155;
+    border-radius: 20px; padding: 1px 7px;
+    font-size: 8px; font-weight: 700; color: #94a3b8;
+  }
+
+  /* Color schemes per service family */
+  .purple { background: #1e1025; border-color: #7c3aed; }
+  .purple .svc-name { color: #c4b5fd; }
+  .orange { background: #1a0f00; border-color: #f97316; }
+  .orange .svc-name { color: #fdba74; }
+  .blue { background: #0a1628; border-color: #3b82f6; }
+  .blue .svc-name { color: #93c5fd; }
+  .green { background: #0a1a0f; border-color: #22c55e; }
+  .green .svc-name { color: #86efac; }
+  .red { background: #1a0a0a; border-color: #ef4444; }
+  .red .svc-name { color: #fca5a5; }
+  .teal { background: #0a1a1a; border-color: #14b8a6; }
+  .teal .svc-name { color: #5eead4; }
+  .yellow { background: #1a1500; border-color: #eab308; }
+  .yellow .svc-name { color: #fde047; }
+  .pink { background: #1a0a14; border-color: #ec4899; }
+  .pink .svc-name { color: #f9a8d4; }
+  .gray { background: #0f1117; border-color: #475569; }
+  .gray .svc-name { color: #94a3b8; }
+
+  /* Actors column */
+  .actors { display: flex; flex-direction: column; gap: 16px; margin-right: 20px; }
+  .actor { text-align: center; }
+  .actor-icon { font-size: 32px; }
+  .actor-label { font-size: 10px; color: #64748b; margin-top: 4px; }
+
+  /* ── Main layout ── */
+  .main-layout { display: flex; gap: 0; align-items: flex-start; }
+  .diagram-area { flex: 1; }
+
+  /* DB row */
+  .db-row { display: flex; gap: 20px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+
+  /* Step numbers */
+  .step {
+    position: absolute; top: -10px; left: -10px;
+    width: 20px; height: 20px;
+    background: #f97316; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 900; color: #000;
+  }
+
+  /* Legend */
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 28px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #64748b; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  /* ── Cost table ── */
+  .cost-section { margin-top: 40px; }
+  .cost-section h2 { font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 16px; border-bottom: 1px solid #1e293b; padding-bottom: 8px; }
+  .cost-table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { background: #0d1117; color: #64748b; font-weight: 600; text-align: left; padding: 10px 14px; border-bottom: 1px solid #1e293b; }
+  td { padding: 9px 14px; border-bottom: 1px solid #0d1117; color: #cbd5e1; }
+  tr:hover td { background: #0d1117; }
+  .tier-demo { color: #22c55e; font-weight: 700; }
+  .tier-prod { color: #f97316; font-weight: 700; }
+  .tier-high { color: #ef4444; font-weight: 700; }
+  .total-row td { background: #0d1117; font-weight: 700; border-top: 2px solid #1e293b; }
+  .cost-note { font-size: 11px; color: #475569; margin-top: 12px; line-height: 1.6; }
+  .tier-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 28px; }
+  .tier-card { border: 1px solid; border-radius: 12px; padding: 16px; }
+  .tier-card.demo { border-color: #22c55e22; background: #0a1a0f; }
+  .tier-card.prod { border-color: #f9731622; background: #1a0f00; }
+  .tier-card.high { border-color: #ef444422; background: #1a0a0a; }
+  .tier-card h3 { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .tier-card .price { font-size: 28px; font-weight: 900; margin: 8px 0 4px; }
+  .tier-card .price span { font-size: 13px; font-weight: 400; color: #64748b; }
+  .tier-card p { font-size: 11px; color: #64748b; }
+
+  .conn-line {
+    display: flex; align-items: center; gap: 0;
+    font-size: 18px; color: #334155;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>⚽ Fantasy World Cup 2026 — AWS Architecture</h1>
+  <p class="subtitle">Arquitectura de referencia en AWS · Región: us-east-1 · Estimación de costos incluida</p>
+
+  <div class="aws-cloud">
+    <div class="aws-cloud-label">☁ AWS Cloud — us-east-1</div>
+
+    <div class="main-layout">
+
+      <!-- Actors -->
+      <div class="actors">
+        <div class="actor"><div class="actor-icon">👤</div><div class="actor-label">Usuarios</div></div>
+        <div class="actor"><div class="actor-icon">🛡️</div><div class="actor-label">Admin</div></div>
+      </div>
+
+      <!-- Diagram -->
+      <div class="diagram-area">
+
+        <!-- Row 1: CDN + Entry -->
+        <div class="row row-gap">
+          <div class="svc orange" style="min-width:120px;">
+            <div class="step">1</div>
+            <div class="svc-icon">🌐</div>
+            <div class="svc-name">Route 53</div>
+            <div class="svc-desc">DNS<br>fantasy-wc2026.com</div>
+          </div>
+          <div class="arrow-right">→</div>
+          <div class="svc purple" style="min-width:130px;">
+            <div class="step">2</div>
+            <div class="svc-icon">⚡</div>
+            <div class="svc-name">CloudFront</div>
+            <div class="svc-desc">CDN · SSL · Cache<br>estáticos</div>
+          </div>
+          <div class="arrow-right">→</div>
+          <div class="svc blue">
+            <div class="step">3</div>
+            <div class="svc-icon">🪣</div>
+            <div class="svc-name">S3</div>
+            <div class="svc-desc">React SPA<br>assets estáticos</div>
+          </div>
+        </div>
+
+        <!-- Arrow down to ALB -->
+        <div class="arrow-down">↓<br><span class="arrow-label">API calls /api/*</span></div>
+
+        <!-- Row 2: ALB -->
+        <div class="row row-gap">
+          <div class="svc teal" style="min-width:140px;">
+            <div class="step">4</div>
+            <div class="svc-icon">⚖️</div>
+            <div class="svc-name">Application<br>Load Balancer</div>
+            <div class="svc-desc">HTTPS · Health checks<br>Target Groups</div>
+          </div>
+        </div>
+
+        <div class="arrow-down">↓</div>
+
+        <!-- VPC -->
+        <div class="vpc">
+          <div class="vpc-label">🔒 VPC — subnets privadas</div>
+
+          <!-- Row 3: ECS Fargate -->
+          <div class="row row-gap" style="margin-top:12px;">
+            <div class="svc orange" style="min-width:150px;">
+              <div class="step">5</div>
+              <div class="svc-icon">🐳</div>
+              <div class="svc-name">ECS Fargate</div>
+              <div class="svc-desc">Fastify API<br>2 tasks · Auto-scale<br>Node.js 22</div>
+              <div class="badge">x2</div>
+            </div>
+            <div class="arrow-right" style="margin: 0 12px;">←→</div>
+            <div class="svc blue">
+              <div class="svc-icon">📦</div>
+              <div class="svc-name">ECR</div>
+              <div class="svc-desc">Docker images<br>server + frontend</div>
+            </div>
+          </div>
+
+          <div class="arrow-down">↓</div>
+
+          <!-- Row 4: Databases -->
+          <div class="db-row">
+
+            <div style="display:flex;flex-direction:column;align-items:center;">
+              <div class="svc blue" style="min-width:130px;">
+                <div class="step">6</div>
+                <div class="svc-icon">🗄️</div>
+                <div class="svc-name">RDS PostgreSQL 16</div>
+                <div class="svc-desc">users · squads<br>matches · squad_players<br>db.t3.small Multi-AZ</div>
+              </div>
+              <div class="arrow-label" style="margin-top:6px;">Fuente de verdad<br>ACID · Prisma ORM</div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;align-items:center;">
+              <div class="svc red" style="min-width:130px;">
+                <div class="step">7</div>
+                <div class="svc-icon">⚡</div>
+                <div class="svc-name">ElastiCache<br>Redis 7</div>
+                <div class="svc-desc">Leaderboard sorted set<br>Match history · Denylist<br>cache.t3.small</div>
+              </div>
+              <div class="arrow-label" style="margin-top:6px;">Rankings O(log N)<br>TTL: token denylist</div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;align-items:center;">
+              <div class="svc green" style="min-width:130px;">
+                <div class="step">8</div>
+                <div class="svc-icon">🔍</div>
+                <div class="svc-name">Meilisearch<br>(EC2 t3.small)</div>
+                <div class="svc-desc">18k+ jugadores<br>Fuzzy search<br>Filtros facetados</div>
+              </div>
+              <div class="arrow-label" style="margin-top:6px;">Búsqueda &lt;50ms<br>Tolerancia tipográfica</div>
+            </div>
+
+          </div>
+
+        </div><!-- /vpc -->
+
+        <!-- Row 5: Monitoring -->
+        <div class="row" style="margin-top:20px; justify-content:flex-end; gap:12px;">
+          <div class="svc yellow" style="min-width:110px;">
+            <div class="svc-icon">📊</div>
+            <div class="svc-name">CloudWatch</div>
+            <div class="svc-desc">Logs · Métricas<br>Alertas</div>
+          </div>
+          <div class="svc gray" style="min-width:110px;">
+            <div class="svc-icon">🔐</div>
+            <div class="svc-name">Secrets Manager</div>
+            <div class="svc-desc">JWT_SECRET<br>ADMIN_SECRET<br>DB credentials</div>
+          </div>
+          <div class="svc pink" style="min-width:110px;">
+            <div class="svc-icon">🚀</div>
+            <div class="svc-name">CodePipeline</div>
+            <div class="svc-desc">CI/CD<br>GitHub → ECR<br>→ ECS deploy</div>
+          </div>
+        </div>
+
+      </div><!-- /diagram-area -->
+    </div><!-- /main-layout -->
+
+    <!-- Legend -->
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div>AWS Compute</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>Storage / DB</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Cache</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>Search</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#7c3aed"></div>CDN / Network</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#eab308"></div>Observability</div>
+    </div>
+
+  </div><!-- /aws-cloud -->
+
+
+  <!-- ── COST REPORT ──────────────────────────────────────────────────────── -->
+  <div class="cost-section">
+    <h2>💰 Estimación de Costos AWS — us-east-1</h2>
+
+    <div class="tier-cards">
+      <div class="tier-card demo">
+        <h3 class="tier-demo">🟢 DEMO / Clase</h3>
+        <div class="price" style="color:#22c55e;">$68<span>/mes</span></div>
+        <p>~50 usuarios concurrentes · t3.micro instances · Single-AZ · Ideal para presentación</p>
+      </div>
+      <div class="tier-card prod">
+        <h3 class="tier-prod">🟠 PRODUCCIÓN</h3>
+        <div class="price" style="color:#f97316;">$235<span>/mes</span></div>
+        <p>~500 usuarios · t3.small instances · Multi-AZ RDS · Auto-scaling ECS</p>
+      </div>
+      <div class="tier-card high">
+        <h3 class="tier-high">🔴 ALTO TRÁFICO</h3>
+        <div class="price" style="color:#ef4444;">$650<span>/mes</span></div>
+        <p>~5000 usuarios · t3.medium+ · Multi-AZ todo · ECS 4 tasks · Reserved instances</p>
+      </div>
+    </div>
+
+    <div class="cost-table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Servicio AWS</th>
+          <th>Configuración Demo</th>
+          <th class="tier-demo">$/mes Demo</th>
+          <th>Configuración Prod</th>
+          <th class="tier-prod">$/mes Prod</th>
+          <th>Configuración Alto</th>
+          <th class="tier-high">$/mes Alto</th>
+          <th>Justificación</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>🌐 Route 53</td>
+          <td>1 hosted zone + DNS queries</td>
+          <td class="tier-demo">$1</td>
+          <td>1 hosted zone + health checks</td>
+          <td class="tier-prod">$2</td>
+          <td>1 hosted zone + failover</td>
+          <td class="tier-high">$5</td>
+          <td>DNS del dominio principal</td>
+        </tr>
+        <tr>
+          <td>⚡ CloudFront</td>
+          <td>10GB transfer/mes</td>
+          <td class="tier-demo">$1</td>
+          <td>50GB transfer/mes</td>
+          <td class="tier-prod">$5</td>
+          <td>200GB transfer/mes</td>
+          <td class="tier-high">$20</td>
+          <td>CDN para React SPA + assets estáticos</td>
+        </tr>
+        <tr>
+          <td>🪣 S3</td>
+          <td>5GB storage + requests</td>
+          <td class="tier-demo">$0.50</td>
+          <td>5GB storage + requests</td>
+          <td class="tier-prod">$1</td>
+          <td>5GB storage + requests</td>
+          <td class="tier-high">$2</td>
+          <td>Hosting estático del frontend React</td>
+        </tr>
+        <tr>
+          <td>⚖️ Application Load Balancer</td>
+          <td>1 ALB + LCU básicas</td>
+          <td class="tier-demo">$18</td>
+          <td>1 ALB + LCU moderadas</td>
+          <td class="tier-prod">$22</td>
+          <td>1 ALB + LCU altas</td>
+          <td class="tier-high">$35</td>
+          <td>Balanceo de carga HTTPS al API</td>
+        </tr>
+        <tr>
+          <td>🐳 ECS Fargate (API)</td>
+          <td>1 task · 0.5vCPU · 1GB RAM</td>
+          <td class="tier-demo">$14</td>
+          <td>2 tasks · 1vCPU · 2GB RAM</td>
+          <td class="tier-prod">$58</td>
+          <td>4 tasks · 2vCPU · 4GB RAM</td>
+          <td class="tier-high">$230</td>
+          <td>Fastify API containerizada sin gestión de servers</td>
+        </tr>
+        <tr>
+          <td>📦 ECR</td>
+          <td>2 imágenes · ~1GB</td>
+          <td class="tier-demo">$0.10</td>
+          <td>2 imágenes · ~1GB</td>
+          <td class="tier-prod">$0.10</td>
+          <td>2 imágenes · ~1GB</td>
+          <td class="tier-high">$0.10</td>
+          <td>Registro de imágenes Docker</td>
+        </tr>
+        <tr>
+          <td>🗄️ RDS PostgreSQL 16</td>
+          <td>db.t3.micro · Single-AZ · 20GB</td>
+          <td class="tier-demo">$15</td>
+          <td>db.t3.small · Multi-AZ · 50GB</td>
+          <td class="tier-prod">$55</td>
+          <td>db.t3.medium · Multi-AZ · 100GB</td>
+          <td class="tier-high">$130</td>
+          <td>Base de datos relacional principal (users, squads, matches)</td>
+        </tr>
+        <tr>
+          <td>⚡ ElastiCache Redis 7</td>
+          <td>cache.t3.micro · Single-AZ</td>
+          <td class="tier-demo">$12</td>
+          <td>cache.t3.small · Single-AZ</td>
+          <td class="tier-prod">$30</td>
+          <td>cache.t3.medium · Cluster mode</td>
+          <td class="tier-high">$80</td>
+          <td>Leaderboard sorted set + match history + token denylist</td>
+        </tr>
+        <tr>
+          <td>🔍 Meilisearch (EC2)</td>
+          <td>t3.micro · 8GB SSD · On-demand</td>
+          <td class="tier-demo">$8</td>
+          <td>t3.small · 30GB SSD · On-demand</td>
+          <td class="tier-prod">$20</td>
+          <td>t3.medium · 60GB SSD · Reserved</td>
+          <td class="tier-high">$40</td>
+          <td>Motor de búsqueda para 18k+ jugadores</td>
+        </tr>
+        <tr>
+          <td>📊 CloudWatch</td>
+          <td>Logs básicos + métricas</td>
+          <td class="tier-demo">$3</td>
+          <td>Logs + métricas + alertas</td>
+          <td class="tier-prod">$8</td>
+          <td>Full observability stack</td>
+          <td class="tier-high">$20</td>
+          <td>Monitoreo, logs, alertas de salud</td>
+        </tr>
+        <tr>
+          <td>🔐 Secrets Manager</td>
+          <td>3 secrets</td>
+          <td class="tier-demo">$1</td>
+          <td>5 secrets</td>
+          <td class="tier-prod">$2</td>
+          <td>5 secrets</td>
+          <td class="tier-high">$2</td>
+          <td>JWT_SECRET, ADMIN_SECRET, DB password</td>
+        </tr>
+        <tr>
+          <td>🌐 NAT Gateway + Data Transfer</td>
+          <td>Mínimo</td>
+          <td class="tier-demo">$4</td>
+          <td>Moderado</td>
+          <td class="tier-prod">$32</td>
+          <td>Alto</td>
+          <td class="tier-high">$86</td>
+          <td>Tráfico saliente desde subnets privadas</td>
+        </tr>
+        <tr class="total-row">
+          <td><strong>TOTAL ESTIMADO</strong></td>
+          <td colspan="2" class="tier-demo"><strong>~$68 / mes</strong><br><small>~$816 / año</small></td>
+          <td colspan="2" class="tier-prod"><strong>~$235 / mes</strong><br><small>~$2,820 / año</small></td>
+          <td colspan="2" class="tier-high"><strong>~$650 / mes</strong><br><small>~$7,800 / año</small></td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <p class="cost-note">
+      ⚠️ <strong>Notas importantes:</strong><br>
+      • Precios estimados para us-east-1 (N. Virginia), abril 2026. Los precios reales pueden variar ±15%.<br>
+      • <strong>Free Tier AWS:</strong> Nuevas cuentas tienen 12 meses gratis: t2.micro RDS, 750h EC2 t2.micro, 5GB S3, 50GB CloudFront. El tier Demo podría costar <strong>~$0-15/mes en el primer año</strong> con Free Tier.<br>
+      • <strong>Ahorro con Reserved Instances (1 año):</strong> RDS y ElastiCache ofrecen hasta 40% de descuento comprando por 1 año (Producción bajaría a ~$165/mes).<br>
+      • <strong>Meilisearch:</strong> Alternativa managed: Meilisearch Cloud a $30/mes para 100k documentos, evita gestionar EC2.<br>
+      • <strong>NAT Gateway:</strong> Es el costo oculto más costoso. En la versión Demo se puede ahorrar exponiendo Meilisearch y Redis en subnet pública (no recomendado para producción).
+    </p>
+
+  </div><!-- /cost-section -->
+
+</div><!-- /page -->
+</body>
+</html>

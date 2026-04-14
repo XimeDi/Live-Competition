@@ -1,13 +1,15 @@
 import { db } from "./db.js"
+import { redis } from "./redis.js"
 import { addUserPoints } from "./userStore.js"
 import { syncLeaderboardScore } from "./leaderboard.js"
 import { MatchEventModel } from "./models/MatchEvent.js"
+import type { MatchPointEntry } from "./matchStore.js"
 
 /**
- * F4.2 — points per player:
- *   Win  → +3
- *   Draw → +1
- *   Loss → +0
+ * F4.2 — Official scoring rules:
+ *   Win:  +3 points per player whose national team wins
+ *   Draw: +1 point  per player whose national team draws
+ *   Loss: +0 points (no points awarded)
  */
 function calcPointsForPlayer(
   homeScore: number,
@@ -23,10 +25,12 @@ function calcPointsForPlayer(
   const myScore = isHome ? homeScore : awayScore
   const oppScore = isHome ? awayScore : homeScore
 
-  if (myScore > oppScore) return 3   // win
-  if (myScore === oppScore) return 1 // draw
-  return 0                           // loss
+  if (myScore > oppScore) return 3  // Win
+  if (myScore === oppScore) return 1 // Draw
+  return 0                           // Loss
 }
+
+const userHistoryKey = (userId: string) => `user:${userId}:match_history`
 
 export async function calculateMatchPoints(
   matchId: string,
@@ -61,28 +65,44 @@ export async function calculateMatchPoints(
       homeNationality,
       awayNationality
     )
-    if (pts === 0) continue
     const userId = sp.squad.userId
     const entry = userMap.get(userId) ?? { points: 0, players: [] }
-    entry.points += pts
-    entry.players.push({ name: sp.playerName, nationality: sp.nationality, points: pts })
+    if (pts > 0) {
+      entry.players.push({ name: sp.playerName, nationality: sp.nationality, points: pts })
+      entry.points += pts
+    }
     userMap.set(userId, entry)
   }
 
-  // Apply points to each user and sync the leaderboard
+  const createdAt = new Date().toISOString()
   let totalPointsDistributed = 0
-  for (const [userId, { points: pts }] of userMap) {
+
+  for (const [userId, { points: pts, players }] of userMap) {
+    if (pts === 0) continue
+
+    // Persist points to PostgreSQL and sync leaderboard in Redis
     const newPoints = await addUserPoints(userId, pts)
     await syncLeaderboardScore(userId, newPoints)
     totalPointsDistributed += pts
+
+    // Write match history entry to Redis for fast per-user reads (F4.8)
+    const entry: MatchPointEntry = {
+      matchId,
+      teamA: homeTeam,
+      teamB: awayTeam,
+      scoreA: homeScore,
+      scoreB: awayScore,
+      pointsEarned: pts,
+      playersRewarded: players,
+      createdAt,
+    }
+    await redis.lpush(userHistoryKey(userId), JSON.stringify(entry))
   }
 
-  // Persist MatchEvent to MongoDB (F4.8 — points breakdown audit log)
-  const userBreakdowns = Array.from(userMap.entries()).map(([userId, { points, players }]) => ({
-    userId,
-    pointsEarned: points,
-    players,
-  }))
+  // Persist MatchEvent to MongoDB (F4.8 — audit log with full breakdown)
+  const userBreakdowns = Array.from(userMap.entries())
+    .filter(([, { points }]) => points > 0)
+    .map(([userId, { points, players }]) => ({ userId, pointsEarned: points, players }))
 
   await MatchEventModel.findOneAndUpdate(
     { matchId },
@@ -96,7 +116,7 @@ export async function calculateMatchPoints(
         homeScore,
         awayScore,
         scoredAt: new Date(),
-        usersAffected: userMap.size,
+        usersAffected: userBreakdowns.length,
         totalPointsDistributed,
         userBreakdowns,
       },
@@ -104,5 +124,5 @@ export async function calculateMatchPoints(
     { upsert: true }
   )
 
-  return { usersAffected: userMap.size, totalPointsDistributed }
+  return { usersAffected: userBreakdowns.length, totalPointsDistributed }
 }

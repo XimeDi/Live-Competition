@@ -67,25 +67,59 @@
 
 **¿Por qué no Meilisearch para el leaderboard?**
 
-Meilisearch está incluido en el stack (previsto para búsqueda de jugadores en el futuro) pero no es adecuado para rankings ordenados dinámicamente.
+Meilisearch está optimizado para búsqueda de texto, no para rankings numéricos ordenados dinámicamente.
+
+### Motor de búsqueda: Meilisearch v1.8
+
+**¿Por qué Meilisearch para búsqueda de jugadores?**
+
+La plataforma tiene más de 18,000 jugadores. PostgreSQL ILIKE es O(n) sin índices de texto completo y no tolera errores tipográficos. Meilisearch resuelve exactamente este problema con:
+- Resultados en <50ms para cualquier consulta
+- Tolerancia a errores tipográficos ("Mbap" → "Mbappé")
+- Manejo de caracteres acentuados
+- Filtrado facetado por posición, nacionalidad, club y rating
+
+**Índice `players`:**
+- Atributos buscables: `name`, `nameNormalized` (sin acentos), `club`, `nationality`
+- Atributos filtrables: `position`, `nationality`, `club`, `rating`, `price`
+- Paginación: máximo 50 resultados por página (nunca se renderizan los 18k+ de golpe)
+
+**Alternativas consideradas:**
+- Elasticsearch: Más poderoso pero configuración compleja, overkill para este volumen.
+- PostgreSQL pg_trgm: No soporta tolerancia tipográfica sofisticada ni aceleración de facetas.
+
+**Historial de puntos por partido (F4.8):** Escrito en Redis como lista por usuario después de cada resultado. Permite mostrar la desglose de puntos sin queries complejos.
+
+**¿Cómo se carga el índice?**
+
+```bash
+# 1. Descargar dataset de Kaggle
+# 2. Procesar CSV a JSON
+node scripts/process-kaggle-players.js --input ./players.csv
+# 3. Iniciar la plataforma (Meilisearch indexa automáticamente)
+docker compose up
+```
 
 ---
 
-## Sistema de puntos
+## Sistema de puntos (F4.2)
 
 El cálculo ocurre **en el servidor** cuando el administrador registra o simula un resultado:
 
 ```
-Por cada jugador en el squad del usuario que juega en el partido:
+Por cada jugador en el squad del usuario cuya selección juega:
 
-  Participación:  +2 pts
-  Victoria:       +6 pts
-  Empate:         +3 pts
-  Derrota:        +1 pt
-  Goles del equipo: +2 pts × goles marcados
+  Victoria:  +3 pts por jugador
+  Empate:    +1 pt  por jugador
+  Derrota:    0 pts
 ```
 
+**Ejemplo:** 3 jugadores brasileños + Brasil gana = 3 × 3 = 9 pts.
+             2 jugadores paraguayos + Paraguay pierde = 0 pts.
+
 Implementación: `server/src/lib/pointsCalculator.ts`
+
+Los puntos se calculan exclusivamente en el servidor para evitar manipulaciones del cliente.
 
 ---
 

@@ -38,6 +38,12 @@ function weightedRandom(): [number, number] {
   return [1, 0]
 }
 
+/**
+ * F4.2 — Official scoring rules (mirrors server/src/lib/pointsCalculator.ts):
+ *   Win:  +3 points per player whose national team wins
+ *   Draw: +1 point  per player whose national team draws
+ *   Loss: +0 points
+ */
 function calcPoints(
   homeScore: number,
   awayScore: number,
@@ -56,14 +62,9 @@ function calcPoints(
     const myScore = isHome ? homeScore : awayScore
     const oppScore = isHome ? awayScore : homeScore
 
-    // Participation points
-    pts += 2
-    // Win/draw/loss
-    if (myScore > oppScore) pts += 6
-    else if (myScore === oppScore) pts += 3
-    else pts += 1
-    // Goals scored by my team
-    pts += myScore * 2
+    if (myScore > oppScore) pts += 3      // Win
+    else if (myScore === oppScore) pts += 1 // Draw
+    // Loss = 0
   }
 
   return pts

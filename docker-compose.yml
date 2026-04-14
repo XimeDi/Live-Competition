@@ -57,6 +57,11 @@ services:
       MEILI_NO_ANALYTICS: "true"
     volumes:
       - meili_data:/meili_data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7700/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     ports:
       - "7700:7700"
 
@@ -67,7 +72,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     volumes:
-      - ./src/data/players.json:/src/data/players.json:ro
+      - ./src/data/players.json:/app/data/players.json:ro
     depends_on:
       db:
         condition: service_healthy
@@ -76,21 +81,19 @@ services:
       mongodb:
         condition: service_healthy
       meilisearch:
-        condition: service_started
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql://fantasy:fantasy@db:5432/fantasy_wc
       REDIS_URL: redis://redis:6379
       MONGODB_URL: mongodb://mongodb:27017/fantasy_wc
       MEILISEARCH_HOST: http://meilisearch:7700
+      MEILISEARCH_API_KEY: ${MEILISEARCH_API_KEY:-}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-30d}
       PORT: 3001
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       ADMIN_SECRET: ${ADMIN_SECRET:-change-me-admin-secret}
-      MEILISEARCH_API_KEY: ${MEILISEARCH_API_KEY:-}
       PLAYERS_JSON_PATH: /app/data/players.json
-    volumes:
-      - ./src/data/players.json:/app/data/players.json
     ports:
       - "3001:3001"
     healthcheck:
