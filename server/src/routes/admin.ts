@@ -3,6 +3,9 @@ import { z } from "zod"
 import { requireAdmin } from "../middleware/requireAdmin.js"
 import { db } from "../lib/db.js"
 import { calculateMatchPoints } from "../lib/pointsCalculator.js"
+import { redis } from "../lib/redis.js"
+import { LEADERBOARD_KEY } from "../lib/leaderboard.js"
+import { MatchEventModel } from "../lib/models/MatchEvent.js"
 
 // Generador de marcadores aleatorio con distribución ponderada
 const SCORE_POOL: [number, number][] = [
@@ -132,6 +135,23 @@ export async function adminRoutes(app: FastifyInstance) {
   // Revierte el partido a estado "programado" (borra el resultado)
   app.post("/matches/:id/reset", async (request, reply) => {
     const { id } = request.params as { id: string }
+
+    const event = await MatchEventModel.findOne({ matchId: id })
+    if (event) {
+      const pipeline = redis.pipeline()
+      for (const b of event.userBreakdowns) {
+        if (b.pointsEarned > 0) {
+          const user = await db.user.update({
+            where: { id: b.userId },
+            data: { points: { decrement: b.pointsEarned } }
+          })
+          pipeline.zadd(LEADERBOARD_KEY, user.points, b.userId)
+        }
+      }
+      await pipeline.exec()
+      await MatchEventModel.deleteOne({ matchId: id })
+    }
+
     await db.match.update({
       where: { id },
       data: { homeScore: null, awayScore: null, status: "scheduled" },
@@ -197,6 +217,19 @@ export async function adminRoutes(app: FastifyInstance) {
     await db.user.updateMany({
       data: { points: 0 }
     })
+    
+    await MatchEventModel.deleteMany({})
+
+    const allUsers = await db.user.findMany({ select: { id: true } })
+    if (allUsers.length > 0) {
+      const redisPipeline = redis.pipeline()
+      for (const u of allUsers) {
+        redisPipeline.zadd(LEADERBOARD_KEY, 0, u.id)
+        redisPipeline.del(`user:${u.id}:match_history`)
+      }
+      await redisPipeline.exec()
+    }
+
     return reply.send({ ok: true })
   })
 

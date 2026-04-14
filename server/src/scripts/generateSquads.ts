@@ -1,13 +1,10 @@
 import "dotenv/config"
-import { hashPassword } from "../lib/password.js"
-import { createUserInStore } from "../lib/userStore.js"
-import { syncLeaderboardScore } from "../lib/leaderboard.js"
+import { db } from "../lib/db.js"
 import { saveSquad } from "../lib/squadStore.js"
 import type { StoredSquadPlayer } from "../lib/squadStore.js"
-import { loadPlayersFromDisk, seedPlayersToMongo } from "../lib/playersIndex.js"
-import { redis } from "../lib/redis.js"
+import { loadPlayersFromDisk } from "../lib/playersIndex.js"
 import { connectMongo, disconnectMongo } from "../lib/mongo.js"
-import { db } from "../lib/db.js"
+import { redis } from "../lib/redis.js"
 
 type Formation = "4-3-3" | "4-4-2" | "3-5-2"
 
@@ -45,60 +42,22 @@ function toStoredPlayer(p: Awaited<ReturnType<typeof loadPlayersFromDisk>>[numbe
 }
 
 async function main() {
-  const shouldFlush = process.env.SEED_FLUSH === "1"
-  const userCount = Number(process.env.SEED_USERS ?? "20")
-  const password = process.env.SEED_PASSWORD ?? "password123"
-
-  // Connect MongoDB
+  console.log("Connecting databases...")
   await connectMongo()
-
-  if (shouldFlush) {
-    // Solo para entornos locales de prueba
-    await redis.flushdb()
-  }
-
-  // Seed players into MongoDB (source of truth for player data)
-  // eslint-disable-next-line no-console
-  console.log("Seeding players into MongoDB…")
-  const inserted = await seedPlayersToMongo()
-  // eslint-disable-next-line no-console
-  console.log(`MongoDB players: ${inserted} newly inserted`)
 
   const players = await loadPlayersFromDisk()
   if (players.length < 1000) {
-    throw new Error(`players dataset too small: got ${players.length}`)
+    throw new Error(`Players dataset too small: got ${players.length}`)
   }
 
-  const passwordHash = await hashPassword(password)
-  const adminPasswordHash = await hashPassword("Datos2")
+  // Get all users
+  const users = await db.user.findMany()
+  console.log(`Found ${users.length} managers.`)
 
-  // Create the specific admin user requested by the user
-  console.log("Creating requested admin user: kristopherpaz@ufm.edu")
-  await createUserInStore({
-    username: "kristopherpaz",
-    email: "kristopherpaz@ufm.edu",
-    passwordHash: adminPasswordHash,
-  }).catch(() => console.log("Admin user already exists, skipping..."))
+  const BUDGET_LIMIT = 400.0
 
   let created = 0
-  for (let i = 1; i <= userCount; i++) {
-    const username = `manager${String(i).padStart(4, "0")}`
-    const email = `${username}@example.com`
-
-    const res = await createUserInStore({ username, email, passwordHash })
-    if ("conflict" in res) {
-      continue
-    }
-    created++
-
-    // Initialize with 0 points (user requested)
-    const initialPts = 0
-    const updatedUser = await db.user.update({
-      where: { id: res.user.id },
-      data: { points: initialPts },
-    })
-    await syncLeaderboardScore(res.user.id, updatedUser.points)
-
+  for (const user of users) {
     let validSquad = false;
     let formation: Formation = "4-3-3";
     let squad: (StoredSquadPlayer | null)[] = [];
@@ -123,7 +82,7 @@ async function main() {
           if (cnt >= 3) continue // Max 3 players from same nationality
           
           // Budget constraint check
-          if (currentSpent + cand.price > 400.0) continue
+          if (currentSpent + cand.price > BUDGET_LIMIT) continue
           
           const stored = toStoredPlayer(cand)
           if (squad.some((p) => p?.id === stored.id)) continue // Avoid duplicates within the same squad
@@ -141,18 +100,19 @@ async function main() {
         }
       }
 
-      if (!failed && currentSpent <= 400.0) {
+      if (!failed && currentSpent <= BUDGET_LIMIT) {
         validSquad = true
       }
     }
 
-    await saveSquad(res.user.id, { formation: formation!, players: squad as StoredSquadPlayer[] })
+    // saveSquad overwrites existing squads automatically handling previous Squad data
+    const finalSpent = squad.reduce((sum, p) => sum + (p?.price || 0), 0)
+    await saveSquad(user.id, { formation, players: squad as StoredSquadPlayer[] })
+    created++
+    console.log(`Squad generated for ${user.username} (${formation}) | Gasto: $${finalSpent.toFixed(1)}M`)
   }
 
-  // eslint-disable-next-line no-console
-  console.log(`Seed complete. created=${created} requested=${userCount}`)
-  // eslint-disable-next-line no-console
-  console.log(`Login with any user: manager0001@example.com / ${password}`)
+  console.log(`\nSquad generation complete: ${created}/${users.length} squads successfully randomized within budget.`)
 
   await disconnectMongo()
   await db.$disconnect()
@@ -160,8 +120,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err)
   process.exit(1)
 })
-

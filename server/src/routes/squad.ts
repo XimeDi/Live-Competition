@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify"
 import { z } from "zod"
 import { requireAuth } from "../middleware/requireAuth.js"
 import { db } from "../lib/db.js"
+import { loadPlayersFromDisk } from "../lib/playersIndex.js"
 
 const playerSchema = z.object({
   id: z.string(),
@@ -12,7 +13,7 @@ const playerSchema = z.object({
 
 const squadBody = z.object({
   formation: z.enum(["4-3-3", "4-4-2", "3-5-2"]),
-  budget: z.number().min(0).max(1000),
+  budget: z.number().min(0).max(400),
   players: z.array(z.union([z.null(), playerSchema])).length(11),
 })
 
@@ -61,13 +62,38 @@ export async function squadRoutes(app: FastifyInstance) {
         .send({ error: "Validation failed", details: parsed.error.flatten().fieldErrors })
     }
 
-    const { formation, budget, players } = parsed.data
+    const { formation, players } = parsed.data
+    
+    // SERVER-SIDE BUDGET VALIDATION
+    const allPlayers = await loadPlayersFromDisk()
+    let totalSpent = 0
+
+    // Only non-null players
+    const activePlayers = players.filter(p => p !== null)
+    
+    for (const p of activePlayers) {
+      const dbPlayer = allPlayers.find(x => String(x.id) === String(p.id))
+      if (!dbPlayer) {
+        return reply.status(400).send({ error: "Player not found in database", id: p.id })
+      }
+      totalSpent += dbPlayer.price
+    }
+
+    if (totalSpent > 400.0) {
+      return reply.status(400).send({ 
+        error: "Budget exceeded limit.", 
+        spent: totalSpent,
+        limit: 400.0 
+      })
+    }
+
+    const calculatedBudget = Math.max(0, 400.0 - totalSpent)
 
     // Upsert del registro de equipo
     const squad = await db.squad.upsert({
       where: { userId },
-      create: { userId, formation, budget },
-      update: { formation, budget, updatedAt: new Date() },
+      create: { userId, formation, budget: calculatedBudget },
+      update: { formation, budget: calculatedBudget, updatedAt: new Date() },
     })
 
     // Reemplaza los jugadores del equipo de forma atómica

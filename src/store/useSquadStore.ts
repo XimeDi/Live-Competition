@@ -18,7 +18,7 @@ export interface SquadState {
   restoreFromBackend: (token: string) => Promise<void>
 }
 
-const INITIAL_BUDGET = 1000.0
+const INITIAL_BUDGET = 400.0
 
 export const getPositionForIndex = (index: number, formation: Formation): Position => {
   if (index === 0) return "GK"
