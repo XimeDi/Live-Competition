@@ -1,10 +1,8 @@
 /**
- * Match results, scoring engine and points breakdown (F4.1–F4.8).
- *
- * Redis layout:
- *   matches:all          → sorted set  (score = timestamp ms, member = matchId)
- *   match:{id}           → JSON string (MatchRecord)
- *   user:{userId}:match_history → Redis list of JSON (MatchPointEntry), newest first
+ * Motor de resultados y puntuación (F4.1–F4.8). Almacenamiento en Redis:
+ *   matches:all                → sorted set (matchId por timestamp)
+ *   match:{id}                 → JSON del partido
+ *   user:{userId}:match_history → lista de entradas de puntos, más reciente primero
  */
 import { randomUUID } from "node:crypto"
 import { redis } from "./redis.js"
@@ -54,10 +52,7 @@ function outcomePoints(teamNationality: string, teamA: string, teamB: string, sc
   return 0
 }
 
-/**
- * Persist a match result and award points to every user whose squad contains
- * players from either national team (F4.2).
- */
+/** Guarda el resultado y reparte puntos a usuarios con jugadores de los equipos involucrados (F4.2). */
 export async function addMatch(
   teamA: string,
   teamB: string,
@@ -73,12 +68,12 @@ export async function addMatch(
     createdAt: new Date().toISOString(),
   }
 
-  // Persist match record.
+  // Persiste el partido en Redis
   const ts = Date.now()
   await redis.set(matchKey(match.id), JSON.stringify(match))
   await redis.zadd(MATCHES_ZSET, ts, match.id)
 
-  // Award points to all users.
+  // Reparte puntos a todos los usuarios
   const userIds = await getAllUserIds()
   await Promise.all(
     userIds.map(async (userId) => {
@@ -101,10 +96,10 @@ export async function addMatch(
 
       const newTotal = await updateUserPoints(userId, totalPoints)
 
-      // Sync leaderboard sorted set.
+      // Sincroniza el leaderboard en Redis
       await syncLeaderboardScore(userId, newTotal)
 
-      // Push breakdown entry to the front of the user's history list.
+      // Agrega el desglose al historial del usuario
       const entry: MatchPointEntry = {
         matchId: match.id,
         teamA,
@@ -122,7 +117,7 @@ export async function addMatch(
   return match
 }
 
-/** Return all matches newest-first (F4.5). */
+/** Devuelve todos los partidos ordenados del más reciente al más antiguo (F4.5). */
 export async function getAllMatches(): Promise<MatchRecord[]> {
   const total = await redis.zcard(MATCHES_ZSET)
   if (total === 0) return []
@@ -133,7 +128,7 @@ export async function getAllMatches(): Promise<MatchRecord[]> {
     .map((r) => JSON.parse(r) as MatchRecord)
 }
 
-/** Return the match points breakdown for a single user (F4.8). */
+/** Devuelve el historial de puntos de un usuario por partido (F4.8). */
 export async function getUserMatchHistory(userId: string): Promise<MatchPointEntry[]> {
   const raws = await redis.lrange(userHistoryKey(userId), 0, -1)
   return raws.map((r) => JSON.parse(r) as MatchPointEntry)

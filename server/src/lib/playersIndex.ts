@@ -9,7 +9,7 @@ const TASK_TIMEOUT_MS = 600_000 as const
 export type MeiliPlayerDoc = {
   id: string
   name: string
-  /** Accent-folded name for fuzzy / unaccented typing (F2.2) */
+  /** Nombre sin acentos para búsqueda fuzzy (F2.2). */
   nameNormalized: string
   photo: string
   nationality: string
@@ -29,7 +29,7 @@ function meiliQuoteString(s: string): string {
   return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`
 }
 
-/** F2.2: match "Mbappe" to "Mbappé" etc. */
+/** Elimina acentos para que "Mbappe" encuentre "Mbappé" (F2.2). */
 function normalizeForSearch(s: string): string {
   return s
     .normalize("NFD")
@@ -270,7 +270,7 @@ export function buildSearchFilter(input: {
   return parts.join(" AND ")
 }
 
-/** F2.1: Meilisearch text query only from 2+ chars; 0–1 char uses empty query (browse + filters). */
+/** Búsqueda activa solo desde 2 caracteres; con menos devuelve query vacío (F2.1). */
 function resolveSearchQuery(q: string): string {
   const t = q.trim()
   if (t.length < 2) return ""

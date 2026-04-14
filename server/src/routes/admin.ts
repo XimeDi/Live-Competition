@@ -4,7 +4,7 @@ import { requireAdmin } from "../middleware/requireAdmin.js"
 import { db } from "../lib/db.js"
 import { calculateMatchPoints } from "../lib/pointsCalculator.js"
 
-// Weighted random score generator (same distribution as the original simulator)
+// Generador de marcadores aleatorio con distribución ponderada
 const SCORE_POOL: [number, number][] = [
   [0, 0], [1, 0], [0, 1], [1, 1],
   [2, 0], [0, 2], [2, 1], [1, 2],
@@ -41,10 +41,10 @@ const createMatchBody = z.object({
 })
 
 export async function adminRoutes(app: FastifyInstance) {
-  // All routes in this plugin require admin authentication
+  // Todas las rutas requieren autenticación de admin
   app.addHook("preHandler", requireAdmin)
 
-  // GET /api/admin/matches
+  // Lista todos los partidos
   app.get("/matches", async (_request, reply) => {
     const matches = await db.match.findMany({
       orderBy: [{ groupName: "asc" }, { createdAt: "asc" }],
@@ -52,7 +52,7 @@ export async function adminRoutes(app: FastifyInstance) {
     return reply.send({ matches })
   })
 
-  // POST /api/admin/matches — create a new match
+  // Crea un nuevo partido
   app.post("/matches", async (request, reply) => {
     const parsed = createMatchBody.safeParse(request.body)
     if (!parsed.success) {
@@ -71,7 +71,7 @@ export async function adminRoutes(app: FastifyInstance) {
     return reply.status(201).send({ match })
   })
 
-  // PUT /api/admin/matches/:id/result — set a real result and award points
+  // Registra el resultado real y reparte puntos
   app.put("/matches/:id/result", async (request, reply) => {
     const { id } = request.params as { id: string }
     const parsed = resultBody.safeParse(request.body)
@@ -103,7 +103,7 @@ export async function adminRoutes(app: FastifyInstance) {
     return reply.send({ ok: true, homeScore, awayScore, ...stats })
   })
 
-  // POST /api/admin/matches/:id/simulate — random result + award points
+  // Simula un resultado aleatorio y reparte puntos
   app.post("/matches/:id/simulate", async (request, reply) => {
     const { id } = request.params as { id: string }
 
@@ -129,7 +129,7 @@ export async function adminRoutes(app: FastifyInstance) {
     return reply.send({ ok: true, homeScore, awayScore, ...stats })
   })
 
-  // POST /api/admin/matches/:id/reset — revert to scheduled (removes result)
+  // Revierte el partido a estado "programado" (borra el resultado)
   app.post("/matches/:id/reset", async (request, reply) => {
     const { id } = request.params as { id: string }
     await db.match.update({
@@ -139,7 +139,7 @@ export async function adminRoutes(app: FastifyInstance) {
     return reply.send({ ok: true })
   })
 
-  // DELETE /api/admin/matches/:id — delete a match entirely
+  // Elimina un partido por completo
   app.delete("/matches/:id", async (request, reply) => {
     const { id } = request.params as { id: string }
     await db.match.delete({ where: { id } })

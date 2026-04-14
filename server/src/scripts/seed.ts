@@ -53,7 +53,7 @@ async function main() {
   await connectMongo()
 
   if (shouldFlush) {
-    // WARNING: for local demos only.
+    // Solo para entornos locales de prueba
     await redis.flushdb()
   }
 
@@ -99,14 +99,14 @@ async function main() {
     })
     await syncLeaderboardScore(res.user.id, updatedUser.points)
 
-    // Optional: give them a valid 11-player squad.
+    // Arma un equipo de 11 jugadores válido respetando la regla de 3 por nación
     const formation = pickFormation()
     const squad: (StoredSquadPlayer | null)[] = Array(11).fill(null)
     const perNation = new Map<string, number>()
 
     for (let slot = 0; slot < 11; slot++) {
       const pos = expectedPosForIndex(slot, formation)
-      // Try a few random candidates until we satisfy the 3-per-nation rule.
+      // Busca candidatos aleatorios hasta cumplir la regla de 3 por nación
       for (let tries = 0; tries < 300; tries++) {
         const cand = players[randInt(0, players.length - 1)]!
         if (cand.position !== pos) continue
@@ -114,7 +114,7 @@ async function main() {
         const cnt = perNation.get(n) ?? 0
         if (cnt >= 3) continue
         const stored = toStoredPlayer(cand)
-        // Prevent duplicates
+        // Evita duplicados en el equipo
         if (squad.some((p) => p?.id === stored.id)) continue
         squad[slot] = stored
         perNation.set(n, cnt + 1)

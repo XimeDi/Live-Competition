@@ -3,9 +3,9 @@ import { randomUUID } from "node:crypto"
 
 export type AccessTokenPayload = {
   sub: string
-  /** JWT ID — used for logout denylist (F1.5). */
+  /** ID único del token, usado para la lista negra al cerrar sesión (F1.5). */
   jti: string
-  /** Expiration as Unix epoch seconds. */
+  /** Fecha de expiración en segundos Unix. */
   exp: number
 }
 

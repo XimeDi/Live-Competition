@@ -1,15 +1,15 @@
 import { redis } from "./redis.js"
 import { db } from "./db.js"
 
-/** Global ranking: score = fantasy points, member = user id (Redis sorted set). */
+/** Tabla de clasificación global en Redis (sorted set: puntos → userId). */
 export const LEADERBOARD_KEY = "leaderboard:global"
 
-/** Upsert score in the leaderboard (O(log N)). Call whenever user points change. */
+/** Actualiza el puntaje del usuario en el leaderboard (O(log N)). */
 export async function syncLeaderboardScore(userId: string, points: number): Promise<void> {
   await redis.zadd(LEADERBOARD_KEY, points, userId)
 }
 
-/** 1-based rank (1 = top), or null if user not in the set. */
+/** Devuelve el ranking 1-based del usuario, o null si no está en el set. */
 export async function getLeaderboardRank(userId: string): Promise<number | null> {
   const r = await redis.zrevrank(LEADERBOARD_KEY, userId)
   if (r === null) return null

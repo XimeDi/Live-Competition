@@ -104,7 +104,7 @@ export const useSquadStore = create<SquadState>()(
         return state.players.every((p) => p !== null)
       },
 
-      /** Push the current squad to the backend. Call after any mutation when authenticated. */
+      /** Sincroniza el equipo actual con el backend tras cualquier cambio. */
       syncToServer: async (token: string) => {
         const { formation, budget, players } = get()
         try {
@@ -118,7 +118,7 @@ export const useSquadStore = create<SquadState>()(
             ),
           })
         } catch {
-          // Non-fatal — local state is still the source of truth for the UI
+          // No es fatal: el estado local sigue siendo la fuente de verdad para la UI
         }
       },
       restoreFromBackend: async (token: string) => {

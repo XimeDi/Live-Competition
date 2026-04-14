@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Plus, Trash2, Settings, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { Plus, Trash2, Settings, AlertCircle, CheckCircle2, Info } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CardContent } from '@/components/ui/card'
 import { useSquadStore, getPositionForIndex, GET_POSITION_COORDS } from '@/store/useSquadStore'
@@ -113,6 +113,31 @@ export function SquadBuilder() {
                 </AnimatePresence>
               </div>
             </CardContent>
+          </div>
+
+          {/* Scoring rules — F4.3 */}
+          <div className="rounded-2xl border border-border/60 bg-card/60 overflow-hidden">
+            <div className="px-4 py-3 border-b border-border/40 bg-foreground/[0.02] flex items-center gap-2">
+              <Info className="h-4 w-4 text-primary" />
+              <span className="text-xs font-semibold text-foreground/70">Cómo funcionan los puntos</span>
+            </div>
+            <div className="px-4 py-4 space-y-2 text-xs text-foreground/60">
+              <div className="flex items-center gap-2">
+                <span className="text-base">🏆</span>
+                <span><span className="text-emerald-400 font-bold">+3 pts</span> por jugador si su selección gana</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-base">🤝</span>
+                <span><span className="text-amber-400 font-bold">+1 pt</span> por jugador si su selección empata</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-base">❌</span>
+                <span><span className="text-foreground/40 font-bold">+0 pts</span> si su selección pierde</span>
+              </div>
+              <p className="text-foreground/30 pt-1 border-t border-border/30">
+                Los puntos se acumulan en el leaderboard global tras cada partido.
+              </p>
+            </div>
           </div>
         </motion.div>
 

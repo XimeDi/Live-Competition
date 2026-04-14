@@ -46,6 +46,8 @@ const SORT_LABELS_ES: Record<SortOption, string> = {
 const DEFAULT_FILTERS: SearchFilters = {
   query: '',
   minRating: 0,
+  maxRating: 99,
+  minPrice: 0,
   maxPrice: 300,
   position: 'ALL',
   league: 'ALL',
@@ -284,7 +286,7 @@ export function Search() {
                   <label className="text-xs font-semibold text-foreground/50 uppercase tracking-widest">{t.nationality}</label>
                   <Select
                     value={filters.nationalities[0] || 'ALL'}
-                    onValueChange={val => setFilters(prev => ({ ...prev, nationalities: (!val || val === 'ALL') ? [] : [val] }))}
+                    onValueChange={val => setFilters(prev => ({ ...prev, nationalities: val === 'ALL' ? [] : [val as string] }))}
                   >
                     <SelectTrigger className="h-10 bg-background/60 border-border/60 rounded-xl text-sm">
                       <SelectValue placeholder={t.allNations} />
