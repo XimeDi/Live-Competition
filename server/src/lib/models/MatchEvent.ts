@@ -11,7 +11,8 @@
  *   • PostgreSQL already holds the authoritative match schedule/score; MongoDB
  *     holds the derived *scoring event* with rich nested breakdowns.
  */
-import mongoose, { Schema, model, models } from "mongoose"
+import mongoose from "mongoose"
+const { Schema, model, models } = mongoose
 import type { Document } from "mongoose"
 
 export interface IPlayerPoints {

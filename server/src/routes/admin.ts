@@ -146,6 +146,70 @@ export async function adminRoutes(app: FastifyInstance) {
     return reply.send({ ok: true })
   })
 
+  // POST /api/admin/matches/simulate-round/:round — simulate all matches in a round (1, 2, or 3)
+  app.post("/matches/simulate-round/:round", async (request, reply) => {
+    const { round } = request.params as { round: string }
+    const roundIdx = Number(round)
+    
+    // Find all matches
+    const allMatches = await db.match.findMany({
+      orderBy: [{ matchDate: "asc" }, { createdAt: "asc" }],
+    })
+
+    // Group matches by date to find the specific "round"
+    const dates = [...new Set(allMatches.map(m => m.matchDate?.toISOString()))].sort()
+    const targetDate = dates[roundIdx - 1]
+
+    if (!targetDate) {
+      return reply.status(404).send({ error: "Round not found" })
+    }
+
+    const matchesToSimulate = allMatches.filter(m => m.matchDate?.toISOString() === targetDate && m.status === "scheduled")
+    
+    let totalAffected = 0
+    let totalPoints = 0
+
+    for (const match of matchesToSimulate) {
+      const [homeScore, awayScore] = weightedRandom()
+      await db.match.update({ where: { id: match.id }, data: { homeScore, awayScore, status: "finished" } })
+
+      const stats = await calculateMatchPoints(
+        match.id,
+        match.homeTeam,
+        match.awayTeam,
+        homeScore,
+        awayScore,
+        match.homeNationality,
+        match.awayNationality
+      )
+      totalAffected += stats.usersAffected
+      totalPoints += stats.totalPointsDistributed
+    }
+
+    return reply.send({ ok: true, matchesSimulated: matchesToSimulate.length, totalAffected, totalPoints })
+  })
+
+  // POST /api/admin/matches/reset-all — clear all results and manager points
+  app.post("/matches/reset-all", async (_request, reply) => {
+    // Reset all matches
+    await db.match.updateMany({
+      data: { homeScore: null, awayScore: null, status: "scheduled" }
+    })
+    
+    // Reset all user points to 0
+    await db.user.updateMany({
+      data: { points: 0 }
+    })
+
+    // Clear leaderboard in Redis
+    const redis = (app as any).redis
+    if (redis) {
+      await redis.flushall()
+    }
+
+    return reply.send({ ok: true })
+  })
+
   // GET /api/admin/stats — global platform stats
   app.get("/stats", async (_request, reply) => {
     const [userCount, squadCount, matchCount, finishedCount] = await Promise.all([

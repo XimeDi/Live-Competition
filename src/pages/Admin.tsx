@@ -3,38 +3,31 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion, AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
 import {
-  Play,
-  Trash2,
-  RotateCcw,
   Shield,
   Users,
   Trophy,
   Activity,
   CheckCircle2,
-  Clock,
+  Zap,
   Eye,
   EyeOff,
+  LayoutDashboard,
+  Swords,
+  Settings,
+  LogOut,
+  ChevronRight,
+  Menu,
 } from "lucide-react"
 import {
   adminGetMatches,
   adminGetStats,
   adminSetResult,
   adminSimulateMatch,
-  adminResetMatch,
-  adminDeleteMatch,
+  adminSimulateRound,
+  adminResetTournament,
   type Match,
 } from "@/services/api/matches"
-
-const GROUP_COLORS: Record<string, string> = {
-  A: "bg-red-500/20 text-red-400 border-red-500/30",
-  B: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  C: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  D: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  E: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  F: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
-  G: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  H: "bg-pink-500/20 text-pink-400 border-pink-500/30",
-}
+import { getLeaderboard, type LeaderboardEntry } from "@/services/api/leaderboard"
 
 // ── Auth screen ──────────────────────────────────────────────────────────────
 function AdminLogin({ onAuth }: { onAuth: (secret: string) => void }) {
@@ -132,248 +125,167 @@ function StatCard({ label, value, icon: Icon, color }: {
 }
 
 // ── Result input form ─────────────────────────────────────────────────────────
-function ResultForm({
-  match,
-  adminSecret,
-  onDone,
-}: {
-  match: Match
-  adminSecret: string
-  onDone: () => void
-}) {
-  const [home, setHome] = useState("")
-  const [away, setAway] = useState("")
+function AdminMatchRow({ match, adminSecret }: { match: Match; adminSecret: string }) {
   const queryClient = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const [s1, setS1] = useState(match.homeScore ?? 0)
+  const [s2, setS2] = useState(match.awayScore ?? 0)
 
-  const setResultMutation = useMutation({
-    mutationFn: () =>
-      adminSetResult(match.id, Number(home), Number(away), adminSecret),
-    onSuccess: (data) => {
+  const simulateMutation = useMutation({
+    mutationFn: () => adminSimulateMatch(match.id, adminSecret),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-matches"] })
-      queryClient.invalidateQueries({ queryKey: ["matches"] })
-      toast.success(
-        `Resultado registrado: ${data.homeScore} - ${data.awayScore} · ${data.usersAffected} users · +${data.totalPointsDistributed} pts`
-      )
-      onDone()
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] })
     },
     onError: (err: Error) => toast.error(err.message),
   })
 
-  const valid =
-    home !== "" &&
-    away !== "" &&
-    !isNaN(Number(home)) &&
-    !isNaN(Number(away)) &&
-    Number(home) >= 0 &&
-    Number(away) >= 0
+  const saveMutation = useMutation({
+    mutationFn: () => adminSetResult(match.id, s1, s2, adminSecret),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-matches"] })
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] })
+      setEditing(false)
+      toast.success(`Updated: ${data.homeScore}:${data.awayScore}`)
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
 
   return (
-    <div className="flex items-center gap-2 mt-3">
-      <input
-        type="number"
-        min={0}
-        max={20}
-        placeholder="0"
-        value={home}
-        onChange={(e) => setHome(e.target.value)}
-        className="w-14 h-9 rounded-lg border border-border/60 bg-background text-center text-sm font-bold text-foreground focus:outline-none focus:border-primary/60 transition-all"
-      />
-      <span className="text-foreground/30 font-bold">—</span>
-      <input
-        type="number"
-        min={0}
-        max={20}
-        placeholder="0"
-        value={away}
-        onChange={(e) => setAway(e.target.value)}
-        className="w-14 h-9 rounded-lg border border-border/60 bg-background text-center text-sm font-bold text-foreground focus:outline-none focus:border-primary/60 transition-all"
-      />
-      <button
-        onClick={() => setResultMutation.mutate()}
-        disabled={!valid || setResultMutation.isPending}
-        className="flex-1 h-9 rounded-lg bg-primary text-black text-xs font-bold hover:bg-primary/90 transition-all disabled:opacity-50 flex items-center justify-center gap-1"
-      >
-        {setResultMutation.isPending ? (
-          <div className="h-3.5 w-3.5 rounded-full border-2 border-black/30 border-t-black animate-spin" />
+    <div className="group relative flex items-center gap-6 p-4 rounded-2xl bg-white/[0.01] border border-white/[0.03] hover:bg-white/[0.03] hover:border-indigo-500/20 transition-all">
+      <div className="flex-1 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-[140px]">
+          <span className="text-sm font-bold text-white">{match.homeTeam}</span>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {editing ? (
+            <div className="flex items-center gap-1">
+              <input 
+                type="number" 
+                value={s1} 
+                onChange={e => setS1(parseInt(e.target.value))} 
+                className="w-10 h-8 rounded-lg bg-white/5 border border-white/10 text-center text-xs font-bold text-white"
+              />
+              <span className="text-slate-600 px-1">-</span>
+              <input 
+                type="number" 
+                value={s2} 
+                onChange={e => setS2(parseInt(e.target.value))} 
+                className="w-10 h-8 rounded-lg bg-white/5 border border-white/10 text-center text-xs font-bold text-white"
+              />
+            </div>
+          ) : (
+            <div className={`flex items-center gap-2 px-3 py-1 rounded-lg ${match.status === 'finished' ? 'bg-indigo-500/10 border border-indigo-500/20' : 'bg-white/5 border border-white/5'}`}>
+              <span className={`text-sm font-black tabular-nums ${match.status === 'finished' ? 'text-indigo-400' : 'text-slate-500'}`}>
+                {match.homeScore ?? '-'}
+              </span>
+              <span className="text-slate-700 font-bold">:</span>
+              <span className={`text-sm font-black tabular-nums ${match.status === 'finished' ? 'text-indigo-400' : 'text-slate-500'}`}>
+                {match.awayScore ?? '-'}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3 min-w-[140px] justify-end">
+          <span className="text-sm font-bold text-white">{match.awayTeam}</span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {editing ? (
+          <button onClick={() => saveMutation.mutate()} className="h-8 w-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20">
+            <CheckCircle2 className="h-4 w-4" />
+          </button>
         ) : (
-          <CheckCircle2 className="h-3.5 w-3.5" />
+          <>
+            <button onClick={() => setEditing(true)} className="h-8 w-8 rounded-lg bg-white/5 text-slate-500 flex items-center justify-center hover:text-white hover:bg-white/10 transition-all">
+              <Settings className="h-4 w-4" />
+            </button>
+            {match.status !== 'finished' && (
+              <button 
+                onClick={() => simulateMutation.mutate()} 
+                disabled={simulateMutation.isPending}
+                className="h-8 px-3 rounded-lg bg-indigo-500/10 text-indigo-400 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500 hover:text-white transition-all border border-indigo-500/20"
+              >
+                {simulateMutation.isPending ? '...' : 'SIM'}
+              </button>
+            )}
+          </>
         )}
-        Guardar
-      </button>
-      <button
-        onClick={onDone}
-        className="h-9 px-3 rounded-lg border border-border/60 text-foreground/40 text-xs font-medium hover:text-foreground transition-all"
-      >
-        Cancelar
-      </button>
+      </div>
     </div>
   )
 }
 
-// ── Match card ────────────────────────────────────────────────────────────────
-function AdminMatchCard({
-  match,
-  adminSecret,
-}: {
-  match: Match
-  adminSecret: string
-}) {
-  const [showForm, setShowForm] = useState(false)
-  const queryClient = useQueryClient()
-  const finished = match.status === "finished"
-  const groupColor =
-    GROUP_COLORS[match.groupName] ?? "bg-gray-500/20 text-gray-400 border-gray-500/30"
-
-  const simulateMutation = useMutation({
-    mutationFn: () => adminSimulateMatch(match.id, adminSecret),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["admin-matches"] })
-      queryClient.invalidateQueries({ queryKey: ["matches"] })
-      toast.success(
-        `Simulado: ${data.homeScore} - ${data.awayScore} · ${data.usersAffected} usuarios · +${data.totalPointsDistributed} pts`
-      )
-    },
-    onError: (err: Error) => toast.error(err.message),
+function AdminLeaderboardTable() {
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-leaderboard"],
+    queryFn: () => getLeaderboard(1, 40),
   })
 
-  const resetMutation = useMutation({
-    mutationFn: () => adminResetMatch(match.id, adminSecret),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-matches"] })
-      queryClient.invalidateQueries({ queryKey: ["matches"] })
-      toast.success("Partido reiniciado")
-    },
-    onError: (err: Error) => toast.error(err.message),
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: () => adminDeleteMatch(match.id, adminSecret),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-matches"] })
-      queryClient.invalidateQueries({ queryKey: ["matches"] })
-      toast.success("Partido eliminado")
-    },
-    onError: (err: Error) => toast.error(err.message),
-  })
-
-  const busy =
-    simulateMutation.isPending || resetMutation.isPending || deleteMutation.isPending
+  const entries = data?.data ?? []
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`rounded-2xl border p-4 transition-all ${
-        finished
-          ? "border-primary/30 bg-primary/5"
-          : "border-border/50 bg-card/60"
-      }`}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${groupColor}`}>
-          Grupo {match.groupName}
-        </span>
-        {finished ? (
-          <span className="flex items-center gap-1 text-[10px] font-bold text-primary">
-            <CheckCircle2 className="h-3 w-3" /> Finalizado
-          </span>
-        ) : (
-          <span className="flex items-center gap-1 text-[10px] font-bold text-foreground/40">
-            <Clock className="h-3 w-3" /> Por jugar
-          </span>
-        )}
+    <div className="w-full">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-white/5 bg-white/[0.02]">
+              <th className="text-left py-5 px-8 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Rank</th>
+              <th className="text-left py-5 px-8 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Manager Identification</th>
+              <th className="text-right py-5 px-8 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Point Aggregate</th>
+              <th className="text-right py-5 px-8 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {isLoading ? (
+               Array.from({ length: 5 }).map((_, i) => (
+                 <tr key={i} className="animate-pulse"><td colSpan={4} className="py-6 px-8"><div className="h-6 bg-white/5 rounded-lg" /></td></tr>
+               ))
+            ) : entries.map((entry: LeaderboardEntry) => (
+              <tr key={entry.userId} className="hover:bg-white/[0.01] transition-colors group">
+                <td className="py-5 px-8">
+                  <span className="font-black text-indigo-400 tabular-nums">#{entry.rank.toString().padStart(2, '0')}</span>
+                </td>
+                <td className="py-5 px-8">
+                  <div className="flex items-center gap-4">
+                    <div className="h-10 w-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center font-black text-slate-500 group-hover:border-indigo-500/30 group-hover:text-indigo-400 transition-all uppercase">
+                      {entry.username.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="font-bold text-white">{entry.username}</p>
+                      <p className="text-[10px] text-slate-500 uppercase tracking-widest font-black">ID: {entry.userId.slice(0, 8)}</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="py-5 px-8 text-right">
+                  <span className="text-lg font-black text-white tabular-nums">{entry.points.toLocaleString()}</span>
+                  <span className="text-[10px] text-slate-600 font-bold ml-2">PTS</span>
+                </td>
+                <td className="py-5 px-8 text-right">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-black uppercase tracking-widest border border-emerald-500/20">
+                    <div className="h-1 w-1 rounded-full bg-emerald-500" />
+                    Verified
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-
-      {/* Teams + score */}
-      <div className="flex items-center justify-between gap-2 mb-3">
-        <div className="flex flex-col items-center gap-1 flex-1 min-w-0">
-          <span className="text-2xl">{match.homeFlag}</span>
-          <span className="text-xs font-semibold text-foreground/80 text-center truncate w-full">{match.homeTeam}</span>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          {finished ? (
-            <span className="text-2xl font-black text-foreground tabular-nums">
-              {match.homeScore} — {match.awayScore}
-            </span>
-          ) : (
-            <span className="text-sm font-black text-foreground/30">VS</span>
-          )}
-        </div>
-        <div className="flex flex-col items-center gap-1 flex-1 min-w-0">
-          <span className="text-2xl">{match.awayFlag}</span>
-          <span className="text-xs font-semibold text-foreground/80 text-center truncate w-full">{match.awayTeam}</span>
-        </div>
-      </div>
-
-      {/* Action buttons */}
-      {!finished && !showForm && (
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowForm(true)}
-            disabled={busy}
-            className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl bg-primary text-black text-xs font-bold hover:bg-primary/90 transition-all disabled:opacity-50"
-          >
-            <CheckCircle2 className="h-3.5 w-3.5" /> Resultado real
-          </button>
-          <button
-            onClick={() => simulateMutation.mutate()}
-            disabled={busy}
-            className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl border border-secondary/40 text-secondary text-xs font-bold hover:bg-secondary/10 transition-all disabled:opacity-50"
-          >
-            {simulateMutation.isPending ? (
-              <div className="h-3.5 w-3.5 rounded-full border-2 border-secondary/30 border-t-secondary animate-spin" />
-            ) : (
-              <Play className="h-3.5 w-3.5" />
-            )}
-            Simular
-          </button>
-        </div>
-      )}
-
-      {!finished && showForm && (
-        <ResultForm
-          match={match}
-          adminSecret={adminSecret}
-          onDone={() => setShowForm(false)}
-        />
-      )}
-
-      {finished && (
-        <div className="flex gap-2">
-          <button
-            onClick={() => resetMutation.mutate()}
-            disabled={busy}
-            className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl border border-amber-500/30 text-amber-400 text-xs font-semibold hover:bg-amber-500/10 transition-all disabled:opacity-50"
-          >
-            {resetMutation.isPending ? (
-              <div className="h-3.5 w-3.5 rounded-full border-2 border-amber-400/30 border-t-amber-400 animate-spin" />
-            ) : (
-              <RotateCcw className="h-3.5 w-3.5" />
-            )}
-            Reiniciar
-          </button>
-          <button
-            onClick={() => deleteMutation.mutate()}
-            disabled={busy}
-            className="h-9 px-3 rounded-xl border border-destructive/30 text-destructive text-xs font-semibold hover:bg-destructive/10 transition-all disabled:opacity-50 flex items-center gap-1"
-          >
-            {deleteMutation.isPending ? (
-              <div className="h-3.5 w-3.5 rounded-full border-2 border-destructive/30 border-t-destructive animate-spin" />
-            ) : (
-              <Trash2 className="h-3.5 w-3.5" />
-            )}
-          </button>
-        </div>
-      )}
-    </motion.div>
+    </div>
   )
 }
 
 // ── Main admin panel ──────────────────────────────────────────────────────────
+// ── Main admin portal layout ────────────────────────────────────────────────
 function AdminPanel({ adminSecret, onLogout }: { adminSecret: string; onLogout: () => void }) {
-  const { data: matchesData, isLoading } = useQuery({
+  const [activeView, setActiveView] = useState<"dashboard" | "matches" | "managers" | "system">("dashboard")
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  
+  const { data: matchesData } = useQuery({
     queryKey: ["admin-matches", adminSecret],
     queryFn: () => adminGetMatches(adminSecret),
   })
@@ -384,105 +296,263 @@ function AdminPanel({ adminSecret, onLogout }: { adminSecret: string; onLogout: 
     refetchInterval: 15_000,
   })
 
+  const queryClient = useQueryClient()
+  const simulateRoundMutation = useMutation({
+    mutationFn: (round: number) => adminSimulateRound(round, adminSecret),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-matches"] })
+      queryClient.invalidateQueries({ queryKey: ["matches"] })
+      queryClient.invalidateQueries({ queryKey: ["leaderboard"] })
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] })
+      toast.success(
+        `Jornada simulada: ${data.matchesSimulated} partidos · ${data.totalAffected} usuarios afectados`
+      )
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
+
+  const resetTournamentMutation = useMutation({
+    mutationFn: () => adminResetTournament(adminSecret),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-matches"] })
+      queryClient.invalidateQueries({ queryKey: ["matches"] })
+      queryClient.invalidateQueries({ queryKey: ["leaderboard"] })
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] })
+      toast.success("Torneo reiniciado: todos los partidos y puntos han vuelto a cero.")
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
+
   const matches = matchesData?.matches ?? []
   const finishedCount = matches.filter((m) => m.status === "finished").length
   const groups = [...new Set(matches.map((m) => m.groupName))].sort()
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <div className="h-1 w-full bg-gradient-to-r from-secondary via-primary to-secondary" />
-
-      <div className="container py-8 space-y-8 max-w-5xl">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Shield className="h-4 w-4 text-primary" />
-              <span className="text-xs font-semibold text-primary uppercase tracking-widest">
-                Panel de Administración
-              </span>
+    <div className="flex min-h-screen bg-[#07090d] text-slate-300 font-inter">
+      {/* Sidebar */}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-[#0c1017] border-r border-white/5 transition-transform duration-300 transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 lg:static lg:inset-0`}>
+        <div className="flex flex-col h-full p-6">
+          <div className="flex items-center gap-3 mb-10 px-2">
+            <div className="h-8 w-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+              <Shield className="h-5 w-5 text-white" />
             </div>
-            <h1 className="text-2xl font-black text-foreground">
-              Fantasy Copa del Mundo 2026
-            </h1>
-            <p className="text-sm text-foreground/50 mt-0.5">
-              {finishedCount}/{matches.length} partidos finalizados
-            </p>
+            <span className="font-black text-white tracking-tight text-lg">Hyperion<span className="text-indigo-500">HQ</span></span>
           </div>
+
+          <nav className="flex-1 space-y-1">
+            {[
+              { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+              { id: "matches", label: "Match Engine", icon: Swords },
+              { id: "managers", label: "Technical Staff", icon: Users },
+              { id: "system", label: "System Config", icon: Settings },
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveView(item.id as any)}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                  activeView === item.id
+                    ? "bg-white/5 text-indigo-400 border border-white/5"
+                    : "text-slate-500 hover:text-slate-300 hover:bg-white/[0.02]"
+                }`}
+              >
+                <item.icon className={`h-4 w-4 ${activeView === item.id ? "text-indigo-400" : "text-slate-600"}`} />
+                {item.label}
+              </button>
+            ))}
+          </nav>
+
           <button
             onClick={onLogout}
-            className="h-9 px-4 rounded-xl border border-border/60 text-foreground/50 text-sm font-medium hover:border-destructive/30 hover:text-destructive transition-all"
+            className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-rose-500/60 hover:text-rose-400 hover:bg-rose-500/5 transition-all mt-auto"
           >
-            Salir
+            <LogOut className="h-4 w-4" />
+            Sign Out
           </button>
         </div>
+      </aside>
 
-        {/* Stats */}
-        {statsData && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <StatCard label="Usuarios" value={statsData.userCount} icon={Users} color="text-primary" />
-            <StatCard label="Equipos guardados" value={statsData.squadCount} icon={Shield} color="text-secondary" />
-            <StatCard label="Partidos totales" value={statsData.matchCount} icon={Activity} color="text-foreground" />
-            <StatCard label="Partidos jugados" value={statsData.finishedCount} icon={Trophy} color="text-primary" />
-          </div>
-        )}
-
-        {/* Progress */}
-        {matches.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs text-foreground/50">
-              <span>Progreso del torneo</span>
-              <span>{Math.round((finishedCount / matches.length) * 100)}%</span>
-            </div>
-            <div className="h-2 w-full bg-foreground/5 rounded-full overflow-hidden">
-              <motion.div
-                className="h-full bg-primary rounded-full"
-                animate={{ width: `${(finishedCount / matches.length) * 100}%` }}
-                transition={{ type: "spring", stiffness: 80 }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Matches by group */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="h-8 w-8 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
-          </div>
-        ) : (
-          <div className="space-y-10">
-            {groups.map((group) => (
-              <div key={group}>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className={`text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-lg border ${GROUP_COLORS[group] ?? "bg-gray-500/20 text-gray-400 border-gray-500/30"}`}>
-                    Grupo {group}
-                  </div>
-                  <div className="flex-1 h-px bg-border/30" />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {matches
-                    .filter((m) => m.groupName === group)
-                    .map((match) => (
-                      <AdminMatchCard
-                        key={match.id}
-                        match={match}
-                        adminSecret={adminSecret}
-                      />
-                    ))}
-                </div>
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <header className="h-20 border-b border-white/5 bg-[#0c1017]/80 backdrop-blur-md sticky top-0 z-40 px-8 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="lg:hidden p-2 text-slate-400 hover:text-white">
+              <Menu className="h-6 w-6" />
+            </button>
+            <div>
+              <h2 className="text-white font-bold text-lg capitalize">{activeView}</h2>
+              <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                <span>Control Center</span>
+                <ChevronRight className="h-2.5 w-2.5" />
+                <span className="text-indigo-500/60">Live Environment</span>
               </div>
-            ))}
+            </div>
           </div>
-        )}
 
-        {/* Legend */}
-        <div className="rounded-2xl border border-border/40 bg-card/30 px-6 py-4 text-xs text-foreground/40 space-y-1">
-          <p className="font-semibold text-foreground/60 mb-2">Sistema de puntos</p>
-          <p>⚽ Participación: +2 pts · Victoria: +6 pts · Empate: +3 pts · Derrota: +1 pt</p>
-          <p>🎯 Goles del equipo: +2 pts por gol</p>
-          <p>Los puntos se distribuyen automáticamente a todos los usuarios con jugadores de las selecciones que juegan.</p>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3 pr-6 border-r border-white/5">
+              <div className="text-right hidden sm:block">
+                <p className="text-xs font-bold text-white leading-none mb-1">Kris Paz</p>
+                <p className="text-[10px] text-indigo-500/70 font-black uppercase tracking-widest">Master Admin</p>
+              </div>
+              <div className="h-10 w-10 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center font-black text-indigo-400">
+                KP
+              </div>
+            </div>
+            <div className="h-8 w-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            </div>
+          </div>
+        </header>
+
+        <div className="flex-1 overflow-y-auto p-8 lg:p-12">
+          <div className="max-w-7xl mx-auto">
+            <AnimatePresence mode="wait">
+              {activeView === "dashboard" && (
+                <motion.div
+                  key="dashboard"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-12"
+                >
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <StatCard label="Total Users" value={statsData?.userCount ?? 0} icon={Users} color="text-indigo-400" />
+                    <StatCard label="Squads Created" value={statsData?.squadCount ?? 0} icon={Shield} color="text-cyan-400" />
+                    <StatCard label="Matches Played" value={statsData?.finishedCount ?? 0} icon={Activity} color="text-indigo-400" />
+                    <StatCard label="Completion" value={`${Math.round((finishedCount / matches.length) * 100)}%`} icon={Trophy} color="text-indigo-400" />
+                  </div>
+
+                  {/* World Cup Simulation Engine Card */}
+                  <div className="relative group overflow-hidden bg-[#0c1017] border border-white/5 p-8 rounded-[2rem] shadow-2xl">
+                    <div className="absolute top-0 right-0 p-8 text-white/5 -mr-12 -mt-12 group-hover:scale-110 transition-transform duration-700">
+                      <Zap className="h-64 w-64" />
+                    </div>
+                    
+                    <div className="relative z-10 space-y-8">
+                      <div>
+                        <h3 className="text-3xl font-black text-white tracking-tight uppercase italic">Match Simulation <span className="text-indigo-500">Engine</span></h3>
+                        <p className="text-slate-500 text-sm max-w-lg mt-2 font-medium">Batch process tournament phases with high-precision score generators and instant manager point distribution.</p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {[1, 2, 3].map((num) => (
+                           <button
+                             key={num}
+                             onClick={() => simulateRoundMutation.mutate(num)}
+                             disabled={simulateRoundMutation.isPending}
+                             className="relative p-6 rounded-3xl bg-white/[0.02] border border-white/5 hover:border-indigo-500/40 hover:bg-white/[0.04] transition-all group flex flex-col gap-4 text-left overflow-hidden"
+                           >
+                             <div className="flex items-center justify-between">
+                               <div className="h-10 w-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+                                 <Zap className="h-5 w-5 text-indigo-400 group-hover:animate-pulse" />
+                               </div>
+                               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Jornada {num}</span>
+                             </div>
+                             <div>
+                                <p className="text-xs font-bold text-white uppercase italic tracking-wider">Execute Phase</p>
+                                <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black opacity-40">Group Stage Round {num}</p>
+                             </div>
+                             {simulateRoundMutation.isPending && simulateRoundMutation.variables === num && (
+                               <div className="absolute inset-0 bg-indigo-600/10 backdrop-blur-sm flex items-center justify-center">
+                                 <div className="h-6 w-6 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+                               </div>
+                             )}
+                           </button>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center justify-between pt-8 border-t border-white/5">
+                        <div className="flex items-center gap-3">
+                          <div className="h-2 w-2 rounded-full bg-indigo-500 animate-ping" />
+                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Real-time Simulation Node Active</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {activeView === "matches" && (
+                <motion.div
+                  key="matches"
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  className="space-y-12"
+                >
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
+                    {groups.map((group) => (
+                      <div key={group} className="space-y-6">
+                        <div className="flex items-center gap-4">
+                          <div className="h-10 w-2 rounded-full bg-indigo-600 shadow-lg shadow-indigo-600/20" />
+                          <h4 className="text-xl font-black text-white italic uppercase tracking-tight">Group <span className="text-indigo-500">{group}</span></h4>
+                        </div>
+                        <div className="space-y-3">
+                          {matches
+                            .filter((m) => m.groupName === group)
+                            .map((match) => (
+                              <AdminMatchRow key={match.id} match={match} adminSecret={adminSecret} />
+                            ))}
+                        </div>
+                      </div>
+                    ))}
+                   </div>
+                </motion.div>
+              )}
+
+              {activeView === "managers" && (
+                <motion.div
+                  key="managers"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-8"
+                >
+                  <div className="bg-[#0c1017] border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
+                    <AdminLeaderboardTable />
+                  </div>
+                </motion.div>
+              )}
+
+              {activeView === "system" && (
+                <motion.div
+                   key="system"
+                   initial={{ opacity: 0, scale: 0.95 }}
+                   animate={{ opacity: 1, scale: 1 }}
+                   exit={{ opacity: 0, scale: 0.95 }}
+                   className="max-w-xl space-y-8"
+                >
+                  <div className="bg-[#0c1017] border border-white/5 rounded-3xl p-8 space-y-6">
+                     <div>
+                       <h3 className="text-xl font-bold text-white mb-2">Destructive Actions</h3>
+                       <p className="text-sm text-slate-500">Manage critical system state and database resets.</p>
+                     </div>
+                     
+                     <div className="p-6 rounded-2xl bg-rose-500/5 border border-rose-500/10 space-y-4">
+                       <p className="text-xs text-rose-500 font-bold uppercase tracking-widest leading-relaxed">
+                         Warning: Resetting the tournament will clear all match results and set every manager's points to exactly zero.
+                       </p>
+                       <button
+                         onClick={() => {
+                           if (confirm("REINICIAR TODO EL TORNEO: ¿Estás seguro?")) {
+                             resetTournamentMutation.mutate();
+                           }
+                         }}
+                         disabled={resetTournamentMutation.isPending}
+                         className="flex items-center gap-2 px-6 h-11 rounded-xl bg-rose-500 text-black font-bold text-xs uppercase tracking-widest hover:bg-rose-400 transition-all shadow-lg shadow-rose-500/20"
+                       >
+                         {resetTournamentMutation.isPending ? "Resetting..." : "Reset Tournament Database"}
+                       </button>
+                     </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

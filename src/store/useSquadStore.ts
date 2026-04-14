@@ -1,7 +1,8 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type { Player, Position } from "@/types"
-import { saveSquad } from "@/services/api/squad"
+import { saveSquad, fetchSquad } from "@/services/api/squad"
+import playersData from "@/data/players.json"
 
 export type Formation = "4-3-3" | "4-4-2" | "3-5-2"
 
@@ -14,6 +15,7 @@ export interface SquadState {
   removePlayer: (index: number) => void
   getIsComplete: () => boolean
   syncToServer: (token: string) => Promise<void>
+  restoreFromBackend: (token: string) => Promise<void>
 }
 
 const INITIAL_BUDGET = 1000.0
@@ -117,6 +119,31 @@ export const useSquadStore = create<SquadState>()(
           })
         } catch {
           // Non-fatal — local state is still the source of truth for the UI
+        }
+      },
+      restoreFromBackend: async (token: string) => {
+        try {
+          const { squad } = await fetchSquad(token)
+          if (!squad) return
+
+          const fullPlayers = squad.players.map((p) => {
+            if (!p) return null
+            const found = (playersData as any[]).find((pd) => pd.id === parseInt(p.id) || pd.id === p.id)
+            if (!found) return null
+            return {
+              ...found,
+              id: String(found.id),
+              photo: `https://images.weserv.nl/?url=${found.photo.replace("https://", "")}&w=120&h=120&fit=cover&mask=circle`,
+            } as Player
+          })
+
+          set({
+            formation: squad.formation as any,
+            players: fullPlayers,
+            budget: squad.budget,
+          })
+        } catch {
+          // Ignore fetch errors during sync
         }
       },
     }),

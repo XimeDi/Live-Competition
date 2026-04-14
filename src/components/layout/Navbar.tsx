@@ -53,6 +53,20 @@ export function Navbar() {
               </Link>
             )
           })}
+
+          {/* Admin shortcut (only for kris) */}
+          {user?.email === "kristopherpaz@ufm.edu" && (
+            <Link
+              to="/admin"
+              className={`group flex items-center gap-3 transition-all ${
+                location.pathname === "/admin" ? "text-primary" : "text-foreground/40 hover:text-primary"
+              }`}
+            >
+              <div className={`h-1 w-4 rounded-full transition-all ${location.pathname === "/admin" ? "bg-primary w-8" : "bg-transparent group-hover:bg-primary/20"}`} />
+              <Shield className={`h-4 w-4 ${location.pathname === "/admin" ? "text-primary" : "text-foreground/20"}`} />
+              <span>Admin</span>
+            </Link>
+          )}
         </nav>
 
         {/* Desktop Right Controls */}

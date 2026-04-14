@@ -46,7 +46,7 @@ function toStoredPlayer(p: Awaited<ReturnType<typeof loadPlayersFromDisk>>[numbe
 
 async function main() {
   const shouldFlush = process.env.SEED_FLUSH === "1"
-  const userCount = Number(process.env.SEED_USERS ?? "500")
+  const userCount = Number(process.env.SEED_USERS ?? "20")
   const password = process.env.SEED_PASSWORD ?? "password123"
 
   // Connect MongoDB
@@ -70,6 +70,15 @@ async function main() {
   }
 
   const passwordHash = await hashPassword(password)
+  const adminPasswordHash = await hashPassword("Datos2")
+
+  // Create the specific admin user requested by the user
+  console.log("Creating requested admin user: kristopherpaz@ufm.edu")
+  await createUserInStore({
+    username: "kristopherpaz",
+    email: "kristopherpaz@ufm.edu",
+    passwordHash: adminPasswordHash,
+  }).catch(() => console.log("Admin user already exists, skipping..."))
 
   let created = 0
   for (let i = 1; i <= userCount; i++) {
@@ -82,11 +91,11 @@ async function main() {
     }
     created++
 
-    // Give everyone some points so the leaderboard is meaningful.
-    const randomPts = randInt(0, 120)
+    // Initialize with 0 points (user requested)
+    const initialPts = 0
     const updatedUser = await db.user.update({
       where: { id: res.user.id },
-      data: { points: randomPts },
+      data: { points: initialPts },
     })
     await syncLeaderboardScore(res.user.id, updatedUser.points)
 

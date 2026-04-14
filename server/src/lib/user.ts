@@ -10,6 +10,7 @@ export type StoredUserRecord = {
 
 export type PublicUser = {
   id: string
+  email: string
   username: string
   points: number
   rank: number
@@ -18,6 +19,7 @@ export type PublicUser = {
 export function toPublicUser(user: StoredUserRecord): PublicUser {
   return {
     id: user.id,
+    email: user.email,
     username: user.username,
     points: user.points,
     rank: user.rank,

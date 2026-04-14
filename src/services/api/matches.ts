@@ -79,6 +79,26 @@ export function adminDeleteMatch(
   })
 }
 
+export function adminSimulateRound(
+  round: number,
+  adminSecret: string
+): Promise<{ ok: boolean; matchesSimulated: number; totalAffected: number; totalPoints: number }> {
+  return apiJson<{ ok: boolean; matchesSimulated: number; totalAffected: number; totalPoints: number }>(
+    `/api/admin/matches/simulate-round/${round}`,
+    {
+      method: "POST",
+      headers: { "X-Admin-Secret": adminSecret },
+    }
+  )
+}
+
+export function adminResetTournament(adminSecret: string): Promise<{ ok: boolean }> {
+  return apiJson<{ ok: boolean }>(`/api/admin/matches/reset-all`, {
+    method: "POST",
+    headers: { "X-Admin-Secret": adminSecret },
+  })
+}
+
 export function adminGetStats(adminSecret: string): Promise<{
   userCount: number
   squadCount: number

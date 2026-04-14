@@ -3,11 +3,14 @@ import { X, Zap, Shield, Target, Activity, Flame } from 'lucide-react'
 import { Button } from './button'
 
 interface Player {
-  id: number
+  id: string
   name: string
   photo: string
   rating: number
   club: string
+  clubLogo?: string
+  league?: string
+  leagueLogo?: string
   nationality: string
   position: string
   price: number
@@ -34,6 +37,8 @@ export function ScoutReportModal({ player, isOpen, onClose, onSign, canSign }: S
     { label: "PHYSICAL", value: Math.floor(player.rating * 0.85), icon: Activity },
   ]
 
+  const flagUrl = `https://flagcdn.com/w160/${(player.nationality === 'England' ? 'gb-eng' : player.nationality === 'Scotland' ? 'gb-sct' : player.nationality === 'Wales' ? 'gb-wls' : player.nationality === 'Spain' ? 'es' : player.nationality === 'France' ? 'fr' : player.nationality === 'Germany' ? 'de' : player.nationality === 'Italy' ? 'it' : player.nationality === 'Brazil' ? 'br' : player.nationality === 'Argentina' ? 'ar' : player.nationality === 'Portugal' ? 'pt' : player.nationality === 'Netherlands' ? 'nl' : player.nationality === 'Belgium' ? 'be' : player.nationality === 'Norway' ? 'no' : player.nationality === 'Egypt' ? 'eg' : player.nationality === 'Morocco' ? 'ma' : player.nationality.substring(0,2).toLowerCase())}.png`
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -43,7 +48,7 @@ export function ScoutReportModal({ player, isOpen, onClose, onSign, canSign }: S
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-black/90 backdrop-blur-xl"
+            className="absolute inset-0 bg-black/95 backdrop-blur-xl"
           />
           
           <motion.div
@@ -74,12 +79,20 @@ export function ScoutReportModal({ player, isOpen, onClose, onSign, canSign }: S
                     </p>
                     <div className="h-2 w-16 bg-primary mt-2" />
                     <p className="text-3xl font-oswald font-black text-primary uppercase tracking-[0.4em] italic mt-2">{player.position}</p>
+                    
+                    <div className="mt-6 flex items-center gap-4">
+                      {player.clubLogo && <img src={player.clubLogo} alt={player.club} className="h-10 w-10 object-contain drop-shadow-lg" />}
+                      {player.leagueLogo && <img src={player.leagueLogo} alt={player.league} className="h-8 w-8 object-contain opacity-50" />}
+                    </div>
                   </motion.div>
                 </div>
 
                 <div className="absolute top-10 right-10 z-20">
-                   <div className="w-20 h-20 rounded-full border-4 border-white/20 bg-white/5 backdrop-blur-2xl flex items-center justify-center shadow-2xl overflow-hidden">
-                    <span className="text-xl font-oswald font-black uppercase tracking-tighter text-white/80">{player.nationality.substring(0,3).toUpperCase()}</span>
+                  <div className="flex flex-col items-end gap-3">
+                    <div className="w-24 h-14 rounded-lg border-2 border-white/20 bg-white/5 backdrop-blur-2xl flex items-center justify-center shadow-2xl overflow-hidden p-0.5">
+                      <img src={flagUrl} alt={player.nationality} className="w-full h-full object-cover rounded-[2px]" />
+                    </div>
+                    <span className="text-xs font-oswald font-black uppercase tracking-[0.3em] text-white/40 italic">{player.nationality}</span>
                   </div>
                 </div>
 

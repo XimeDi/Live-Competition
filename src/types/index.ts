@@ -6,6 +6,9 @@ export interface Player {
   photo: string
   nationality: string
   club: string
+  clubLogo?: string
+  league?: string
+  leagueLogo?: string
   position: Position
   rating: number
   price: number
@@ -19,11 +22,12 @@ export interface SearchFilters {
   /** OR group in Meilisearch (F2.3). */
   nationalities: string[]
   position?: Position | 'ALL'
-  club: string
+  league?: string
+  club?: string
   minRating: number
   /** Upper OVR cap; 99 = no filter sent. */
-  maxRating: number
-  minPrice: number
+  maxRating?: number
+  minPrice?: number
   maxPrice: number
   sortBy?: SortOption
 }

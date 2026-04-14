@@ -30,7 +30,10 @@ export async function apiJson<T>(
   init?: RequestInit & { token?: string | null; headers?: Record<string, string> }
 ): Promise<T> {
   const headers = new Headers()
-  headers.set("Content-Type", "application/json")
+  const isMutation = ["POST", "PUT", "PATCH"].includes(init?.method?.toUpperCase() || "")
+  if (init?.body || isMutation) {
+    headers.set("Content-Type", "application/json")
+  }
 
   // Merge extra headers first
   if (init?.headers) {
@@ -44,7 +47,14 @@ export async function apiJson<T>(
   }
 
   const { token: _token, headers: _headers, ...rest } = init ?? {}
-  const res = await fetch(path, { ...rest, headers })
+  
+  // Ensure mutations have at least an empty body to satisfy Fastify
+  const finalInit = { ...rest, headers }
+  if (isMutation && !finalInit.body) {
+    finalInit.body = "{}"
+  }
+
+  const res = await fetch(path, finalInit)
   const body = (await parseJsonSafe(res)) as ErrorBody | T | null
   if (!res.ok) {
     const errBody = body as ErrorBody | null

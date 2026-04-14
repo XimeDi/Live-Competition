@@ -10,7 +10,8 @@
  * (e.g. fetch a single player by id from a squad page) without hitting
  * Meilisearch.
  */
-import mongoose, { Schema, model, models } from "mongoose"
+import mongoose from "mongoose"
+const { Schema, model, models } = mongoose
 
 export interface IPlayer {
   _id: string        // same string id used everywhere ("12345")
