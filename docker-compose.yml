@@ -58,10 +58,11 @@ services:
     volumes:
       - meili_data:/meili_data
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:7700/health || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:7700/health || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
     ports:
       - "7700:7700"
 
