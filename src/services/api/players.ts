@@ -10,7 +10,7 @@ const CLUB_TO_LEAGUE: Record<string, { name: string; logo: string }> = {
   'Athletic Club': { name: 'LaLiga', logo: 'https://cdn.sofifa.net/leagues/53.png' },
   'Real Sociedad': { name: 'LaLiga', logo: 'https://cdn.sofifa.net/leagues/53.png' },
   'Villarreal CF': { name: 'LaLiga', logo: 'https://cdn.sofifa.net/leagues/53.png' },
-  
+
   'Manchester City': { name: 'Premier League', logo: 'https://cdn.sofifa.net/leagues/13.png' },
   'Liverpool': { name: 'Premier League', logo: 'https://cdn.sofifa.net/leagues/13.png' },
   'Arsenal': { name: 'Premier League', logo: 'https://cdn.sofifa.net/leagues/13.png' },
@@ -45,7 +45,7 @@ const CLUB_TO_LEAGUE: Record<string, { name: string; logo: string }> = {
 const ALL_PLAYERS: Player[] = (playersData as any[]).map(p => {
   const photoUrl = p.photo.replace('https://', '')
   const leagueData = CLUB_TO_LEAGUE[p.club] || { name: 'Other', logo: 'https://cdn.sofifa.net/leagues/1.png' }
-  
+
   return {
     ...p,
     id: String(p.id),
@@ -111,11 +111,11 @@ function localFilter(
   const sort: SortOption = filters.sortBy ?? 'rating_desc'
   filtered.sort((a, b) => {
     switch (sort) {
-      case 'rating_asc':  return a.rating - b.rating
-      case 'price_desc':  return b.price - a.price
-      case 'price_asc':   return a.price - b.price
-      case 'name_asc':    return a.name.localeCompare(b.name)
-      default:            return b.rating - a.rating 
+      case 'rating_asc': return a.rating - b.rating
+      case 'price_desc': return b.price - a.price
+      case 'price_asc': return a.price - b.price
+      case 'name_asc': return a.name.localeCompare(b.name)
+      default: return b.rating - a.rating
     }
   })
 
@@ -138,6 +138,7 @@ export const getClubs = () => {
   const clubs = new Set(ALL_PLAYERS.map(p => p.club))
   return Array.from(clubs).sort()
 }
+
 
 export const getClubsByLeague = (league: string | undefined) => {
   if (!league || league === 'ALL') return getClubs()
